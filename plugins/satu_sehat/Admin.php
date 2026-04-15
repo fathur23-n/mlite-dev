@@ -27,7 +27,6 @@ class Admin extends AdminModule
   private $clientid;
   private $secretkey;
   private $organizationid;
-  private $_uploads_radiologi = WEBAPPS_PATH . '/radiologi/pages/upload/';
 
   public function init()
   {
@@ -105,19 +104,19 @@ class Admin extends AdminModule
   }
 
   private function generateDicomUid(): string
-{
+  {
     return '2.25.' . str_replace(['.', ' '], '', microtime()) . mt_rand(100000, 999999);
-}
+  }
  
-private function getDefaultStudyDescription(string $modality): string
-{
+  private function getDefaultStudyDescription(string $modality): string
+  {
     return [
         'CR' => 'X-Ray',        'CT' => 'CT Scan',   'MR' => 'MRI',
         'US' => 'USG',          'DX' => 'Digital X-Ray', 'MG' => 'Mammography',
         'PX' => 'Panoramic X-Ray', 'IO' => 'Intra-oral Radiography',
         'NM' => 'Nuclear Medicine', 'XA' => 'X-Ray Angiography', 'RF' => 'Fluoroscopy',
     ][$modality] ?? $modality;
-}
+  }
  
 private function getOrCreateStudy(string $no_rawat, string $modality, string $description, array $permintaan): array
 {
@@ -135,10 +134,10 @@ private function getOrCreateStudy(string $no_rawat, string $modality, string $de
             ->where('no_rawat', $no_rawat)->where('modality', $modality)->oneArray();
     }
     return $row;
-}
+  }
  
-private function getOrCreateSeries(int $study_id, string $no_rawat, string $modality): array
-{
+  private function getOrCreateSeries(int $study_id, string $no_rawat, string $modality): array
+  {
     $row = $this->db('mlite_mini_pacs_series')->where('study_id', $study_id)->oneArray();
     if (!$row) {
         $this->db('mlite_mini_pacs_series')->save([
@@ -151,16 +150,16 @@ private function getOrCreateSeries(int $study_id, string $no_rawat, string $moda
         $row = $this->db('mlite_mini_pacs_series')->where('study_id', $study_id)->oneArray();
     }
     return $row;
-}
+  }
  
-private function convertImageToDicom(
+  private function convertImageToDicom(
     string $src, string $tmp, string $out,
     string $study_uid, string $series_uid, string $sop_uid, string $sop_class,
     string $patient_name, string $patient_id, string $birth_date, string $sex,
     string $study_date, string $study_time,
     string $accession, string $modality, string $description, int $instance_no,
     string $nm_dokter = '', string $instansi = ''
-): array {
+    ): array {
     $cmd1 = sprintf(
         'img2dcm %s %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s -k %s 2>&1',
         escapeshellarg($src), escapeshellarg($tmp),
@@ -194,10 +193,10 @@ private function convertImageToDicom(
         return ['success' => false, 'message' => 'dcmdjpeg gagal (code ' . $r2 . '): ' . implode(' | ', $o2)];
     }
     return ['success' => true];
-}
+  }
  
-private function getDicomMeta(string $no_rawat): array
-{
+  private function getDicomMeta(string $no_rawat): array
+  {
     $rm  = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
     $nm  = $this->core->getPasienInfo('nm_pasien', $rm);
     $tgl = $this->core->getPasienInfo('tgl_lahir', $rm);
@@ -212,13 +211,10 @@ private function getDicomMeta(string $no_rawat): array
         'tgl_lahir_dicom' => str_replace('-', '', $tgl ?? ''),
         'sex_dicom'       => $sex,
     ];
-}
+  }
  
-// ================================================================
-// getMiniPacs — dengan cek sudah_convert per gambar
-// ================================================================
-public function getMiniPacs($no_rawat_converted = '')
-{
+  public function getMiniPacs($no_rawat_converted = '')
+  {
     $this->_addHeaderFiles();
     $no_rawat    = $no_rawat_converted ? revertNoRawat($no_rawat_converted) : '';
     $gambar_list = [];
@@ -235,7 +231,6 @@ public function getMiniPacs($no_rawat_converted = '')
  
         $noorder = $permintaan['noorder'] ?? '';
  
-        // ===== FIX: cek sudah_convert per gambar =====
         foreach ($gambar_list as &$gambar) {
             if ($noorder) {
                 $hash     = md5($gambar['lokasi_gambar']);
@@ -247,7 +242,6 @@ public function getMiniPacs($no_rawat_converted = '')
         }
         unset($gambar);
  
-        // Ambil studies
         foreach ($this->db('mlite_mini_pacs_study')->where('no_rawat', $no_rawat)->toArray() as $study) {
             $series_list = $this->db('mlite_mini_pacs_series')->where('study_id', $study['id'])->toArray();
             $total_inst  = 0;
@@ -281,13 +275,10 @@ public function getMiniPacs($no_rawat_converted = '')
         'instansi'           => $instansi,
         'webapps_url'        => WEBAPPS_URL,
     ]);
-}
+  }
  
-// ================================================================
-// getSeriesDetail — AJAX HTML series + instance
-// ================================================================
-public function getSeriesDetail($study_id = '')
-{
+  public function getSeriesDetail($study_id = '')
+  {
     header('Content-Type: application/json');
     if (!$study_id) { echo json_encode(['success' => false, 'html' => '']); exit(); }
  
@@ -369,13 +360,10 @@ public function getSeriesDetail($study_id = '')
         'all_instances' => $all_instances,
     ]);
     exit();
-}
+  }
  
-// ================================================================
-// getDcmPreview — Serve JPEG dari DCM via dcmj2pnm (temporary)
-// ================================================================
-public function getDcmPreview($instance_id = '')
-{
+  public function getDcmPreview($instance_id = '')
+  {
     $instance = $this->db('mlite_mini_pacs_instance')->where('id', $instance_id)->oneArray();
     if (!$instance) { http_response_code(404); exit(); }
  
@@ -396,14 +384,10 @@ public function getDcmPreview($instance_id = '')
     readfile($jpg_path);
     @unlink($jpg_path);
     exit();
-}
+  }
  
-// ================================================================
-// postSendImagingStudy — Kirim/Update ImagingStudy ke Satu Sehat
-// Logic: ada id_imaging_study → PUT (update), belum ada → POST
-// ================================================================
-public function postSendImagingStudy()
-{
+  public function postSendImagingStudy()
+  {
     header('Content-Type: application/json');
  
     $no_rawat = $_POST['no_rawat'] ?? '';
@@ -447,9 +431,6 @@ public function postSendImagingStudy()
     $id_dokter = $this->db('mlite_satu_sehat_mapping_praktisi')
         ->select('practitioner_id')->where('kd_dokter', $kd_dokter)->oneArray();
  
-    // ===== Ambil Patient ID Satu Sehat =====
-    // Prioritas 1: cari via NIK pasien
-    // Prioritas 2: fallback dari subject Encounter yang sudah berhasil dikirim
     $no_ktp_pasien = $this->core->getPasienInfo('no_ktp', $meta['no_rkm_medis']);
     $id_pasien     = '';
  
@@ -630,11 +611,8 @@ public function postSendImagingStudy()
         ]);
     }
     exit();
-}
- 
-// ================================================================
-// postConvertDcm
-// ================================================================
+  }
+
 public function postConvertDcm()
 {
     header('Content-Type: application/json');
@@ -670,7 +648,6 @@ public function postConvertDcm()
     $series = $this->getOrCreateSeries((int)$study['id'], $no_rawat, $modality);
     $meta   = $this->getDicomMeta($no_rawat);
  
-    // Ambil nama dokter dari tabel dokter & instansi dari settings
     $kd_dokter = $this->core->getRegPeriksaInfo('kd_dokter', $no_rawat);
     $nm_dokter = $this->db('dokter')
         ->select('nm_dokter')
@@ -720,11 +697,8 @@ public function postConvertDcm()
  
     echo json_encode(['success' => true, 'message' => 'Sukses!', 'dcm_filename' => $dcm_file]);
     exit();
-}
+  }
  
-// ================================================================
-// postUploadDicom
-// ================================================================
 public function postUploadDicom()
 {
     header('Content-Type: application/json');
@@ -813,11 +787,8 @@ public function postUploadDicom()
  
     echo json_encode(['success' => true, 'message' => 'Berhasil!', 'no_rawat_converted' => $nr_conv]);
     exit();
-}
+  }
  
-// ================================================================
-// postDeleteStudy
-// ================================================================
 public function postDeleteStudy()
 {
     header('Content-Type: application/json');
@@ -836,11 +807,10 @@ public function postDeleteStudy()
  
     echo json_encode(['success' => true]);
     exit();
-}
+  }
 
   public function getToken()
   {
-
     $curl = curl_init();
 
     curl_setopt_array($curl, array(
@@ -1589,7 +1559,6 @@ public function postDeleteStudy()
       $display = 'inpatient encounter';
     }
 
-    // ===== FIX: ganti mlite_satu_sehat_lokasi =====
     if ($status_lanjut == 'Ranap') {
       $mapping_lokasi = $this->db('satu_sehat_mapping_lokasi_ranap')
         ->where('kd_kamar', $kd_poli)->oneArray();
@@ -1598,8 +1567,6 @@ public function postDeleteStudy()
         ->where('kd_poli', $kd_poli)->oneArray();
     }
     $lokasi_id = isset($mapping_lokasi['id_lokasi_satusehat']) ? $mapping_lokasi['id_lokasi_satusehat'] : '';
-    // ==============================================
-
     $praktisi_id = isset($no_ktp_dokter['practitioner_id']) ? $no_ktp_dokter['practitioner_id'] : '';
 
     $__patientResp = $this->getPatient($no_ktp_pasien);
@@ -1737,10 +1704,8 @@ public function postDeleteStudy()
   }
 
   public function getEncounterBundle($no_rawat, $param = '')
-{
-    // Tangkap semua output (warning/deprecated) agar tidak bocor ke JSON
+  {
     ob_start();
- 
     // Require src classes sebagai fallback jika autoloader gagal
     $src_path = __DIR__ . '/src/';
     foreach ([
@@ -1877,8 +1842,7 @@ public function postDeleteStudy()
             "valueQuantity": {"value": ' . (float)$sistole . ',"unit": "mm[Hg]","system": "http://unitsofmeasure.org","code": "mm[Hg]"}
         },"request": {"method": "POST","url": "Observation"}},';
     }
- 
-    // ==== Composition ====
+
     $composition_json = '';
     try {
         $zonaWaktu_composition = $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu;
@@ -1886,7 +1850,6 @@ public function postDeleteStudy()
         $composition_json = $composition->toJson();
     } catch (\Exception $e) {}
  
-    // ==== Respiratory ====
     $respiratory_json = '';
     try {
         if (!in_array($inProg['respirasi'] ?? '', ['', '-'])) {
@@ -1896,7 +1859,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Suhu ====
     $temperatur_json = '';
     try {
         if (!empty($inProg['suhu'])) {
@@ -1909,7 +1871,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Nadi ====
     $heart_rate_json = '';
     try {
         if (!in_array($inProg['nadi'] ?? '', ['', '-'])) {
@@ -1919,7 +1880,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Condition ====
     $condition_json = '';
     try {
         if (!empty($diagnosa_pasien['kd_penyakit'])) {
@@ -1928,7 +1888,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Procedure ====
     $procedure_json = '';
     try {
         if ($prosedure_pasien) {
@@ -1938,7 +1897,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== CarePlan Ranap ====
     $careplan_json = '';
     try {
         $cek_ranap = $this->db('kamar_inap')->where('no_rawat', $no_rawat)->oneArray();
@@ -1949,7 +1907,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Medication — FIX: satu_sehat_mapping_obat (bukan mlite_satu_sehat_mapping_obat) ====
     $medicationforrequest_json = ''; $medicationrequest_json = ''; $medicationrequest_ids = [];
     try {
         $no = 1;
@@ -1972,7 +1929,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Medication Dispense — FIX: satu_sehat_mapping_obat ====
     $medicationfordispense_json = ''; $medicationdispense_json = '';
     try {
         $no = 1;
@@ -2001,7 +1957,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Questionnaire & CarePlan Medication ====
     $questionare_json = ''; $careplan_medication_json = '';
     try {
         if ($medicationdispense_json) {
@@ -2014,7 +1969,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Clinical Impression ====
     $clinical_impression_json_history = '';
     try {
         if (!empty($inProg['keluhan'])) {
@@ -2031,7 +1985,6 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ==== Lab ====
     $service_request_lab_json = []; $specimen_json = []; $observation_lab_json = []; $diagnostic_report_json = [];
     try {
         $permintaan_lab = $this->db('permintaan_lab')->join('permintaan_pemeriksaan_lab', 'permintaan_lab.noorder = permintaan_pemeriksaan_lab.noorder')->where('no_rawat', $no_rawat)->toArray();
@@ -2234,11 +2187,10 @@ public function postDeleteStudy()
         echo $this->draw('encounter.html', ['result' => $result, 'pesan' => $pesan, 'response' => $response]);
         exit();
     }
-}
+  }
 
   public function getCondition($no_rawat, $render = true)
   {
-
     $zonawaktu = '+07:00';
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WITA') {
       $zonawaktu = '+08:00';
@@ -2246,7 +2198,6 @@ public function postDeleteStudy()
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WIT') {
       $zonawaktu = '+09:00';
     }
-
 
     $no_rawat = revertNoRawat($no_rawat);
     $kd_poli = $this->core->getRegPeriksaInfo('kd_poli', $no_rawat);
@@ -2921,9 +2872,6 @@ public function postDeleteStudy()
     return $this->draw('mapping.lab.html', ['mapping_lab_satu_sehat' => $mapping_lab, 'template_laboratorium' => $template_laboratorium]);
   }
 
-  // ================================================================
-  // getMappingRad
-  // ================================================================
   public function getMappingRad()
   {
     $this->_addHeaderFiles();
@@ -2937,9 +2885,6 @@ public function postDeleteStudy()
     ]);
   }
 
-  // ================================================================
-  // getRadiology
-  // ================================================================
   public function getRadiology($no_rawat = '', $tipe = '', $render = true)
   {
     $zonawaktu = '+07:00';
@@ -2949,8 +2894,7 @@ public function postDeleteStudy()
     $no_rawat = revertNoRawat($no_rawat);
     $pesan    = '';
     $response = '';
-
-    // ===== Data umum pasien & dokter =====
+    
     $no_rkm_medis  = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
     $nm_pasien     = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
     $no_ktp_pasien = $this->core->getPasienInfo('no_ktp', $no_rkm_medis);
@@ -2970,7 +2914,6 @@ public function postDeleteStudy()
 
     $mlite_satu_sehat_response = $this->db('mlite_satu_sehat_response')->where('no_rawat', $no_rawat)->oneArray();
 
-    // ===== Permintaan radiologi =====
     $permintaan_radiologi = $this->db('permintaan_radiologi')->where('no_rawat', $no_rawat)->oneArray();
     $permintaan_pemeriksaan_radiologi = [];
     $mapping_radiologi = [];
@@ -2986,16 +2929,12 @@ public function postDeleteStudy()
         }
     }
 
-    // ===== Lokasi radiologi =====
     $dep_rad    = $this->db('satu_sehat_mapping_departemen')
         ->where('dep_id', $this->core->getSettings('satu_sehat', 'radiologi'))->oneArray();
     $lokasi_rad = $this->db('satu_sehat_mapping_lokasi_ruangrad')
         ->where('id_organisasi_satusehat', $dep_rad['id_organisasi_satusehat'] ?? '')->oneArray();
     $id_org_rad = $lokasi_rad['id_organisasi_satusehat'] ?? '';
 
-    // ================================================================
-    // TIPE: REQUEST
-    // ================================================================
     if ($tipe == 'request') {
 
         if (empty($permintaan_radiologi['noorder'])) {
@@ -3050,9 +2989,6 @@ public function postDeleteStudy()
         }
         curl_close($curl);
 
-    // ================================================================
-    // TIPE: SPECIMEN
-    // ================================================================
     } elseif ($tipe == 'specimen') {
 
         if (empty($permintaan_radiologi['noorder'])) {
@@ -3093,9 +3029,6 @@ public function postDeleteStudy()
         }
         curl_close($curl);
 
-    // ================================================================
-    // TIPE: OBSERVATION
-    // ================================================================
     } elseif ($tipe == 'observation') {
 
         if (empty($permintaan_radiologi['noorder'])) {
@@ -3141,9 +3074,6 @@ public function postDeleteStudy()
         }
         curl_close($curl);
 
-    // ================================================================
-    // TIPE: DIAGNOSTIC
-    // ================================================================
     } elseif ($tipe == 'diagnostic') {
 
         if (empty($permintaan_radiologi['noorder'])) {
@@ -3190,9 +3120,6 @@ public function postDeleteStudy()
         }
         curl_close($curl);
 
-    // ================================================================
-    // TIPE: IMAGE — konversi JPG ke DCM + POST ImagingStudy ke Satu Sehat
-    // ================================================================
     } elseif ($tipe == 'image') {
 
         // Safety check: ServiceRequest harus sudah ada
@@ -3262,12 +3189,9 @@ public function postDeleteStudy()
             'series_number'       => 1,
         ]);
 
-        // Folder output DCM — pakai noorder
-        // FIX: pakai realpath agar path absolut bersih
         $pacs_base = realpath(BASE_DIR) . '/uploads/pacs/' . $noorder . '/';
         if (!is_dir($pacs_base)) mkdir($pacs_base, 0755, true);
 
-        // Base path gambar radiologi — pakai realpath
         $radiologi_base = realpath(WEBAPPS_PATH . '/radiologi') . '/';
 
         // Format metadata DICOM
@@ -3285,7 +3209,6 @@ public function postDeleteStudy()
         $last_cmd_output = '';
 
         foreach ($gambar_list as $gambar) {
-            // FIX: gunakan realpath untuk resolve path absolut yang bersih
             $src_path = realpath($radiologi_base . $gambar['lokasi_gambar']);
             if (!$src_path || !file_exists($src_path)) continue;
 
@@ -3340,7 +3263,6 @@ public function postDeleteStudy()
             exit();
         }
 
-        // Build FHIR ImagingStudy payload
         $total          = count($instances);
         $instances_json = '';
         foreach ($instances as $i => $inst) {
@@ -4261,9 +4183,6 @@ public function postDeleteStudy()
     ]);
   }
  
-  // ================================================================
-  // postSaveVaksin — AJAX simpan/update mapping vaksin
-  // ================================================================
   public function postSaveVaksin()
   {
     header('Content-Type: application/json');
@@ -4312,9 +4231,6 @@ public function postDeleteStudy()
     exit();
   }
  
-  // ================================================================
-  // postDeleteVaksin — AJAX hapus mapping vaksin
-  // ================================================================
   public function postDeleteVaksin()
   {
     header('Content-Type: application/json');
@@ -4331,7 +4247,7 @@ public function postDeleteStudy()
   }
 
   public function getVaksin($no_rawat, $render = true)
-{
+  {
     $zonawaktu = '+07:00';
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WITA') $zonawaktu = '+08:00';
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WIT')  $zonawaktu = '+09:00';
@@ -4426,18 +4342,15 @@ public function postDeleteStudy()
  
         // Parsing aturan pakai → doseValue
         if (preg_match_all('/\d+/', $obat['aturan_pakai'] ?? '', $m) && count($m[0]) >= 2) {
-    $doseValue = max(1, (int)$m[0][1]);
-} else {
-    $doseValue = 1;
-}
+          $doseValue = max(1, (int)$m[0][1]);
+        } else {
+            $doseValue = 1;
+        }
  
-        // FIX: lotNumber — fallback ke no_faktur jika no_batch kosong
         $lot_number = !empty($gudangbarang['no_batch'])
             ? $gudangbarang['no_batch']
             : ($gudangbarang['no_faktur'] ?? 'N/A');
  
-        // FIX: expirationDate — validasi format & pastikan setelah occurrenceDate
-        // Kalau kosong atau 0000-00-00, set default 2 tahun dari tgl_perawatan
         $occurrence_date = $obat['tgl_perawatan'] ?? date('Y-m-d');
         $expire_raw      = $databarang['expire'] ?? '';
         if (
@@ -4733,9 +4646,6 @@ public function postDeleteStudy()
     $kode_brng = $no_rawat;
     $no_rawat  = revertNoRawat($no_rawat);
 
-    // ================================================================
-    // TIPE: REQUEST
-    // ================================================================
     if ($tipe === 'request') {
 
         $row['medications'] = $this->db('resep_obat')
@@ -4821,9 +4731,6 @@ public function postDeleteStudy()
             curl_close($curl);
         }
 
-    // ================================================================
-    // TIPE: DISPENSE
-    // ================================================================
     } else if ($tipe === 'dispense') {
 
         $row['medications'] = $this->db('resep_obat')
@@ -4911,9 +4818,6 @@ public function postDeleteStudy()
             curl_close($curl);
         }
 
-    // ================================================================
-    // TIPE: STATEMENT
-    // ================================================================
     } else if ($tipe === 'statement') {
 
         $row['medications'] = $this->db('resep_obat')
@@ -4991,15 +4895,11 @@ public function postDeleteStudy()
             curl_close($curl);
         }
 
-    // ================================================================
-    // TIPE: MAPPING — Safety check lokal dulu, lalu CREATE atau UPDATE
-    // ================================================================
     } else if ($tipe == 'mapping') {
 
         $pesan    = 'Gagal mengirim mapping medication platform Satu Sehat!!';
         $response = '';
 
-        // ===== SAFETY CHECK 1: Cek kolom id_medication ada di tabel =====
         try {
             $satu_sehat_mapping_obat = $this->db('satu_sehat_mapping_obat')
                 ->select('id_medication')
@@ -5013,7 +4913,6 @@ public function postDeleteStudy()
             exit();
         }
 
-        // ===== SAFETY CHECK 2: Ambil full data mapping =====
         $mapping = $this->db('satu_sehat_mapping_obat')->where('kode_brng', $kode_brng)->oneArray();
 
         if (empty($mapping)) {
@@ -5031,13 +4930,10 @@ public function postDeleteStudy()
             else echo $response;
             exit();
         }
-        // ===== END SAFETY CHECK =====
 
         $existing_id = $mapping['id_medication'] ?? '';
 
         if (!empty($existing_id)) {
-            // ===== UPDATE (PUT) — sudah ada id_medication di lokal =====
-            // Payload PUT wajib include "id" yang sama dengan URL
             $payload = '{
                 "resourceType": "Medication",
                 "id": "' . $existing_id . '",
@@ -5072,7 +4968,6 @@ public function postDeleteStudy()
             }
 
         } else {
-            // ===== CREATE (POST) — belum ada id_medication di lokal =====
             $payload = '{
                 "resourceType": "Medication",
                 "meta": {"profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Medication"]},
@@ -5494,7 +5389,7 @@ public function postDeleteStudy()
   }
 
   public function postSaveLokasi()
-{
+  {
     $kode      = $_POST['kode']                    ?? '';
     $tipe      = $_POST['tipe']                    ?? '';
     $id_org    = $_POST['id_organisasi_satusehat'] ?? '';
@@ -5542,7 +5437,6 @@ public function postDeleteStudy()
         ],
     ];
  
-    // position → hanya isi jika ada koordinat
     if (!empty($longitude) && !empty($latitude)) {
         $payload['position'] = [
             'longitude' => (float)$longitude,
@@ -5551,7 +5445,6 @@ public function postDeleteStudy()
         ];
     }
  
-    // ===== SIMPAN — POST /Location =====
     if (isset($_POST['simpan'])) {
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -5588,7 +5481,6 @@ public function postDeleteStudy()
         }
     }
  
-    // ===== UPDATE — PUT /Location/{id} =====
     if (isset($_POST['update'])) {
         if (empty($id_lokasi)) {
             $this->notify('danger', 'ID Lokasi Satu Sehat tidak ditemukan, tidak bisa update');
@@ -5634,7 +5526,6 @@ public function postDeleteStudy()
         }
     }
  
-    // ===== HAPUS — DELETE /Location/{id} =====
     if (isset($_POST['hapus'])) {
         if (empty($id_lokasi)) {
             $this->notify('danger', 'ID Lokasi Satu Sehat tidak ditemukan, tidak bisa hapus');
@@ -5658,7 +5549,6 @@ public function postDeleteStudy()
         $http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
  
-        // HTTP 200/204 = sukses delete
         if (in_array($http_code, [200, 204])) {
             $tables = array_column($table_map, 'table');
             foreach ($tables as $t) {
@@ -5673,10 +5563,10 @@ public function postDeleteStudy()
     }
  
     redirect(url([ADMIN, 'satu_sehat', 'lokasi']));
-}
+  }
 
   private function getNamaLokasi(string $tipe, string $kode): string
-{
+  {
     switch ($tipe) {
         case 'ralan':
             $row = $this->db('poliklinik')->select('nm_poli')->where('kd_poli', $kode)->oneArray();
@@ -5693,7 +5583,7 @@ public function postDeleteStudy()
             $row = $this->db('bangsal')->select('nm_bangsal')->where('kd_bangsal', $kode)->oneArray();
             return $row['nm_bangsal'] ?? $kode;
     }
-}
+  }
 
   public function getMappingPraktisi()
   {
