@@ -1,0 +1,743 @@
+<style>
+.mp-wrap * { box-sizing: border-box; }
+.mp-src-card { background:#fff; border:1px solid #e5e7eb; border-radius:6px; overflow:hidden; margin-bottom:10px; }
+.mp-src-head { background:#f9fafb; border-bottom:1px solid #e5e7eb; padding:5px 8px; font-size:11px; font-weight:600; color:#374151; display:flex; align-items:center; justify-content:space-between; }
+.mp-thumb { width:100%; max-height:110px; object-fit:contain; background:#111827; display:block; }
+.mp-src-body { padding:6px 8px; }
+.mp-status { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; }
+.mp-status.idle { background:#fef9c3; color:#854d0e; }
+.mp-status.ok   { background:#dcfce7; color:#166534; }
+.mp-status.err  { background:#fee2e2; color:#991b1b; }
+.mp-status.run  { background:#dbeafe; color:#1e40af; }
+.mp-select, .mp-input { width:100%; font-size:10px; padding:3px 5px; margin-top:3px; border:1px solid #d1d5db; border-radius:4px; color:#374151; }
+.mp-btn-convert { width:100%; margin-top:5px; font-size:10px; padding:4px; background:#2563eb; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+.mp-btn-convert:hover { background:#1d4ed8; }
+.mp-info { font-size:10px; margin-top:3px; }
+.mp-table { width:100%; font-size:12px; border-collapse:collapse; }
+.mp-table thead th { background:#f1f5f9; color:#475569; font-weight:600; padding:9px 12px; border-bottom:1px solid #e2e8f0; white-space:nowrap; text-align:left; }
+.mp-table tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:middle; }
+.mp-table tbody tr.study-row { cursor:pointer; }
+.mp-table tbody tr.study-row:hover td { background:#f8fafc; }
+.mp-table tbody tr.study-row.active td { background:#eff6ff; }
+.mp-mod { background:#2563eb; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; }
+.mp-detail-row { display:none; }
+.mp-detail-row td { padding:0 !important; border-top:2px solid #2563eb !important; }
+.mp-detail-inner { background:#f8fafc; padding:16px 20px; }
+.mp-meta-row { display:flex; gap:8px; padding:3px 0; font-size:12px; }
+.mp-meta-row .lbl { color:#64748b; white-space:nowrap; min-width:130px; }
+.mp-meta-row .val { color:#1e293b; font-weight:500; }
+.mp-uid { font-family:monospace; font-size:10px; color:#2563eb; word-break:break-all; }
+.mp-actions { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
+.mp-act { width:32px; height:32px; border-radius:5px; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:#fff; transition:opacity .15s; }
+.mp-act:hover { opacity:.8; }
+.mp-act-view { background:#2563eb; }
+.mp-act-dl   { background:#475569; }
+.mp-act-del  { background:#dc2626; }
+.mp-act-send { background:#059669; }
+.mp-series-wrap{margin-top:14px;border-radius:5px;overflow:hidden;border:1px solid #e2e8f0;}.mp-series-wrap table{width:100%;margin:0;border-collapse:collapse;}.mp-series-wrap th,.mp-series-wrap td{padding:8px 12px;vertical-align:middle !important;}.mp-series-wrap th:nth-child(1),.mp-series-wrap td:nth-child(1){width:80px;text-align:center;}.mp-series-wrap th:nth-child(2),.mp-series-wrap td:nth-child(2){width:100px;text-align:center;}.mp-series-wrap th:nth-child(3),.mp-series-wrap td:nth-child(3){width:80px;text-align:center;}.mp-series-wrap th:nth-child(4),.mp-series-wrap td:nth-child(4){text-align:left !important;padding-left:16px !important;line-height:1.8;}.mp-series-wrap td:nth-child(4) a{margin-left:0 !important;display:inline-block;}.mp-series-wrap th:nth-child(5),.mp-series-wrap td:nth-child(5){width:80px;text-align:center;white-space:nowrap;}
+.mp-viewer-overlay { display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,.7); align-items:center; justify-content:center; }
+.mp-viewer-overlay.open { display:flex; }
+.mp-viewer-box { width:96%; max-width:1080px; max-height:92vh; background:#1e293b; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,.5); }
+.mp-viewer-header { background:#0f172a; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0; }
+.mp-viewer-header h5 { color:#e2e8f0; margin:0; font-size:13px; }
+.mp-viewer-close { background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; line-height:1; }
+.mp-viewer-close:hover { color:#e2e8f0; }
+.mp-viewer-body { display:flex; flex:1; overflow:hidden; min-height:500px; }
+.mp-viewer-meta { width:180px; min-width:180px; background:#0f172a; padding:14px 12px; border-right:1px solid #1e293b; overflow-y:auto; flex-shrink:0; }
+.mp-viewer-meta .meta-title { font-size:10px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #1e293b; }
+.mp-viewer-meta .meta-row { margin-bottom:8px; }
+.mp-viewer-meta .meta-lbl { font-size:9px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+.mp-viewer-meta .meta-val { font-size:11px; color:#cbd5e1; margin-top:1px; word-break:break-word; }
+.mp-viewer-thumbs { width:90px; min-width:90px; background:#0f172a; border-right:1px solid #1e293b; overflow-y:auto; flex-shrink:0; padding:8px 6px; }
+.mp-thumb-item { margin-bottom:6px; cursor:pointer; border-radius:4px; overflow:hidden; border:2px solid transparent; transition:border-color .15s; }
+.mp-thumb-item.active { border-color:#2563eb; }
+.mp-thumb-item img { width:100%; display:block; background:#111827; }
+.mp-thumb-no { font-size:9px; color:#64748b; text-align:center; padding:2px; }
+.mp-viewer-main { flex:1; background:#0d1117; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+.mp-viewer-main img { max-width:100%; max-height:100%; object-fit:contain; cursor:crosshair; }
+.mp-viewer-loading { position:absolute; inset:0; display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; color:#64748b; }
+.mp-viewer-loading i { font-size:28px; }
+.mp-viewer-toolbar { background:#0f172a; padding:6px 12px; display:flex; gap:6px; flex-shrink:0; border-top:1px solid #1e293b; }
+.mp-tb-btn { background:#1e293b; border:none; color:#94a3b8; padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer; }
+.mp-tb-btn:hover { background:#334155; color:#e2e8f0; }
+.ss-badge-sent { background:#dcfce7; color:#166534; font-size:10px; padding:2px 8px; border-radius:10px; font-weight:600; }
+.ss-badge-unsent { background:#fef9c3; color:#854d0e; font-size:10px; padding:2px 8px; border-radius:10px; font-weight:600; }
+</style>
+
+<div class="mp-wrap">
+<div class="panel panel-default" style="border-radius:8px;overflow:hidden;border-color:#e2e8f0;">
+    <div class="panel-heading" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:11px 16px;">
+        <div class="pull-right">
+            <button id="btn-upload-modal" class="btn btn-sm btn-primary" style="background:#2563eb;border:none;border-radius:5px;">
+                <i class="fa fa-upload"></i> Upload
+            </button>
+        </div>
+        <h3 class="panel-title" style="color:#1e293b;font-size:14px;">
+            <i class="fa fa-film" style="color:#2563eb;margin-right:6px;"></i> Mini PACS
+        </h3>
+    </div>
+    <div class="panel-body" style="background:#f8fafc;padding:14px 16px;">
+
+        <div class="input-group" style="max-width:440px;margin-bottom:12px;">
+            <input type="text" id="input-norawat" class="form-control"
+                   style="border-color:#d1d5db;font-size:13px;"
+                   placeholder="No. Rawat — 2026/04/02/000295"
+                   value="{?=isset_or($no_rawat_converted)?}">
+            <span class="input-group-btn">
+                <button id="btn-cari" class="btn btn-primary" type="button" style="background:#2563eb;border:none;">
+                    <i class="fa fa-search"></i>
+                </button>
+            </span>
+        </div>
+
+        {if: $no_rawat != ''}
+
+        {if: $permintaan.noorder != ''}
+        <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;padding:7px 12px;margin-bottom:12px;font-size:12px;color:#1e40af;">
+            <strong>No. Order:</strong> {?=isset_or($permintaan.noorder)?} &nbsp;&bull;&nbsp;
+            <strong>Tgl:</strong> {?=isset_or($permintaan.tgl_permintaan)?} {?=isset_or($permintaan.jam_permintaan)?} &nbsp;&bull;&nbsp;
+            {?=isset_or($permintaan.diagnosa_klinis)?}
+            &nbsp;&bull;&nbsp;
+            {if: $ss_response.id_imaging_study != ''}
+            <span class="ss-badge-sent"><i class="fa fa-check"></i> ImagingStudy Terkirim: {?=isset_or($ss_response.id_imaging_study)?}</span>
+            {/if}
+            {if: $ss_response.id_imaging_study == ''}
+            <span class="ss-badge-unsent"><i class="fa fa-clock-o"></i> ImagingStudy Belum Dikirim</span>
+            {/if}
+        </div>
+        {/if}
+
+        {if: count($gambar_list) > 0}
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">
+            Gambar Sumber <span style="font-weight:400;color:#9ca3af;">({?=count($gambar_list)?} file)</span>
+        </div>
+        <div class="row" style="margin-bottom:18px;">
+            {loop: $gambar_list}
+            <div class="col-md-2 col-sm-3 col-xs-4">
+                <div class="mp-src-card">
+                    <div class="mp-src-head">
+                        <span>#{?=($key+1)?}</span>
+                        {if: $value.sudah_convert == '1'}
+                        <span class="mp-status ok" id="status-{?=$key?}">Sudah</span>
+                        {/if}
+                        {if: $value.sudah_convert != '1'}
+                        <span class="mp-status idle" id="status-{?=$key?}">Belum</span>
+                        {/if}
+                    </div>
+                    <img src="{?=isset_or($webapps_url)?}/radiologi/{?=isset_or($value.lokasi_gambar)?}" class="mp-thumb" onerror="this.style.display='none';">
+                    <div class="mp-src-body">
+                        <div style="font-size:9px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px;">{?=basename($value.lokasi_gambar)?}</div>
+                        <select class="mp-select select-mod" data-key="{?=$key?}">
+                            <option value="">— Modality —</option>
+                            <option value="CR">CR — Computed Radiography</option>
+                            <option value="CT">CT — Computed Tomography</option>
+                            <option value="MR">MR — Magnetic Resonance</option>
+                            <option value="US">US — Ultrasound</option>
+                            <option value="DX">DX — Digital Radiography</option>
+                            <option value="MG">MG — Mammography</option>
+                            <option value="PX">PX — Panoramic X-Ray</option>
+                            <option value="IO">IO — Intra-oral</option>
+                            <option value="NM">NM — Nuclear Medicine</option>
+                            <option value="XA">XA — X-Ray Angiography</option>
+                            <option value="RF">RF — Fluoroscopy</option>
+                        </select>
+                        <input type="text" class="mp-input input-desc" data-key="{?=$key?}" placeholder="Study Description">
+                        <button class="mp-btn-convert btn-convert"
+                                data-lokasi="{?=isset_or($value.lokasi_gambar)?}"
+                                data-key="{?=$key?}"
+                                data-norawat="{?=isset_or($no_rawat)?}">
+                            {if: $value.sudah_convert == '1'}
+                            <i class="fa fa-refresh"></i> Re-Convert
+                            {/if}
+                            {if: $value.sudah_convert != '1'}
+                            <i class="fa fa-refresh"></i> Convert DCM
+                            {/if}
+                        </button>
+                        <div class="mp-info" id="dcm-info-{?=$key?}"></div>
+                    </div>
+                </div>
+            </div>
+            {/loop}
+        </div>
+        {/if}
+
+        {if: count($gambar_list) == 0}
+        <div style="color:#9ca3af;font-size:12px;padding:4px 0 12px;">Tidak ada gambar radiologi untuk No. Rawat ini.</div>
+        {/if}
+
+        {if: count($studies) > 0}
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">
+            Manage PACS <span style="font-weight:400;color:#9ca3af;">({?=count($studies)?} study)</span>
+        </div>
+        <div style="border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+        <table class="mp-table">
+            <thead>
+                <tr>
+                    <th style="width:32px;"></th>
+                    <th>Tgl Lahir</th>
+                    <th>Nama Pasien</th>
+                    <th>Patient ID</th>
+                    <th>Study Description</th>
+                    <th>Study Date</th>
+                    <th>Modality</th>
+                    <th>Accession #</th>
+                    <th># Ser/Inst</th>
+                </tr>
+            </thead>
+            <tbody>
+                {loop: $studies}
+                <tr class="study-row" data-study-id="{?=isset_or($value.id)?}" data-key="{?=$key?}" data-norawat="{?=isset_or($no_rawat)?}">
+                    <td style="color:#94a3b8;"><i class="fa fa-chevron-right" style="font-size:10px;"></i></td>
+                    <td style="color:#64748b;font-size:11px;">{?=isset_or($value.tgl_lahir)?}</td>
+                    <td><strong>{?=isset_or($value.nm_pasien)?}</strong></td>
+                    <td style="font-family:monospace;font-size:11px;">{?=isset_or($value.no_rkm_medis)?}</td>
+                    <td>{?=isset_or($value.description)?}</td>
+                    <td style="color:#64748b;font-size:11px;">{?=isset_or($value.study_date)?}</td>
+                    <td><span class="mp-mod">{?=isset_or($value.modality)?}</span></td>
+                    <td style="font-family:monospace;font-size:11px;">{?=isset_or($value.noorder)?}</td>
+                    <td><strong style="color:#2563eb;">{?=isset_or($value.series_count)?}/{?=isset_or($value.instance_count)?}</strong></td>
+                </tr>
+                <tr class="mp-detail-row" id="detail-{?=$key?}">
+                    <td colspan="9">
+                        <div class="mp-detail-inner">
+                            <div style="display:flex;gap:24px;justify-content:space-between;align-items:flex-start;">
+                                <div style="flex:1;">
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
+                                        <div>
+                                            <div class="mp-meta-row"><span class="lbl">Study Date</span><span class="val">{?=isset_or($value.study_date)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Study Description</span><span class="val">{?=isset_or($value.description)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Accession number</span><span class="val"><strong>{?=isset_or($value.noorder)?}</strong></span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Study ID</span><span class="val">-</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Study Instance UID</span><span class="val mp-uid">{?=isset_or($value.study_instance_uid)?}</span></div>
+                                        </div>
+                                        <div>
+                                            <div class="mp-meta-row"><span class="lbl">Patient ID</span><span class="val">{?=isset_or($value.no_rkm_medis)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Patient Name</span><span class="val">{?=isset_or($value.nm_pasien)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Patient Birth Date</span><span class="val">{?=isset_or($value.tgl_lahir)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Patient sex</span><span class="val">{?=isset_or($value.jk)?}</span></div>
+                                            <div class="mp-meta-row"><span class="lbl">Institution Name</span><span class="val">{?=isset_or($instansi)?}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="mp-actions">
+                                        <button class="mp-act mp-act-view btn-preview-study" data-study-id="{?=isset_or($value.id)?}" title="Preview DICOM"><i class="fa fa-eye"></i></button>
+                                        <button class="mp-act mp-act-dl btn-dl-study" data-study-id="{?=isset_or($value.id)?}" title="Download"><i class="fa fa-download"></i></button>
+                                        <button class="mp-act mp-act-del btn-delete-study" data-study-id="{?=isset_or($value.id)?}" title="Hapus"><i class="fa fa-trash"></i></button>
+                                        <button class="mp-act mp-act-send btn-send-imaging"
+                                                data-study-id="{?=isset_or($value.id)?}"
+                                                data-norawat="{?=isset_or($no_rawat)?}"
+                                                title="Kirim ke Satu Sehat">
+                                            <i class="fa fa-send"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mp-series-wrap" id="series-table-{?=$key?}">
+                                <div style="text-align:center;color:#94a3b8;padding:14px;font-size:12px;">
+                                    <i class="fa fa-spinner fa-spin"></i> Memuat...
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {/loop}
+            </tbody>
+        </table>
+        </div>
+        {/if}
+
+        {if: count($studies) == 0}
+        <div style="text-align:center;color:#9ca3af;padding:24px;font-size:12px;background:#fff;border:1px dashed #e2e8f0;border-radius:6px;">
+            <i class="fa fa-film" style="font-size:28px;display:block;margin-bottom:8px;color:#e2e8f0;"></i>
+            Belum ada file DICOM. Convert gambar di atas atau Upload manual.
+        </div>
+        {/if}
+
+        {/if}
+    </div>
+</div>
+</div>
+
+<!-- Viewer Modal -->
+<div class="mp-viewer-overlay" id="mpViewerOverlay">
+    <div class="mp-viewer-box">
+        <div class="mp-viewer-header">
+            <h5><i class="fa fa-film" style="color:#2563eb;margin-right:6px;"></i> DICOM Viewer</h5>
+            <button class="mp-viewer-close" id="btn-close-viewer">&times;</button>
+        </div>
+        <div class="mp-viewer-body">
+            <div class="mp-viewer-meta">
+                <div class="meta-title">Metadata DICOM</div>
+                <div class="meta-row"><div class="meta-lbl">Patient Name</div><div class="meta-val" id="m-name">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Patient ID</div><div class="meta-val" id="m-id">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Birth Date</div><div class="meta-val" id="m-birth">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Sex</div><div class="meta-val" id="m-sex">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Study Date</div><div class="meta-val" id="m-date">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Study Time</div><div class="meta-val" id="m-time">-</div></div>
+                <div class="meta-row"><div class="meta-lbl">Modality</div><div class="meta-val" id="m-mod">-</div></div>
+            </div>
+            <div class="mp-viewer-thumbs" id="viewer-thumbs"></div>
+            <div class="mp-viewer-main">
+                <div class="mp-viewer-loading" id="viewer-loading">
+                    <i class="fa fa-spinner fa-spin"></i>
+                    <span style="font-size:12px;">Memuat gambar...</span>
+                </div>
+                <img id="viewer-img" src="" style="display:none;">
+            </div>
+        </div>
+        <div class="mp-viewer-toolbar">
+            <button class="mp-tb-btn" id="tb-bright-up"><i class="fa fa-sun-o"></i> +</button>
+            <button class="mp-tb-btn" id="tb-bright-dn"><i class="fa fa-moon-o"></i> -</button>
+            <button class="mp-tb-btn" id="tb-invert"><i class="fa fa-adjust"></i> Invert</button>
+            <button class="mp-tb-btn" id="tb-reset"><i class="fa fa-refresh"></i> Reset</button>
+            <button class="mp-tb-btn" id="btn-dl-current" style="margin-left:auto;"><i class="fa fa-download"></i> Download</button>
+        </div>
+    </div>
+</div>
+
+<!-- Send Result Modal -->
+<!-- Send Progress + Result Modal -->
+<div class="modal fade" id="sendResultModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content" style="border-radius:8px;overflow:hidden;">
+            <div class="modal-header" style="background:#0f172a;border:none;padding:12px 16px;">
+                <h4 class="modal-title" style="font-size:13px;color:#e2e8f0;margin:0;">
+                    <i class="fa fa-send" style="color:#10b981;margin-right:6px;"></i>
+                    Kirim ImagingStudy ke Satu Sehat
+                </h4>
+            </div>
+            <div class="modal-body" style="padding:24px 20px;background:#fff;">
+
+                <div id="send-progress-wrap" style="text-align:center;padding:10px 0;">
+                    <div id="send-spinner" style="margin-bottom:16px;">
+                        <i class="fa fa-circle-o-notch fa-spin" style="font-size:40px;color:#2563eb;"></i>
+                    </div>
+                    <div id="send-step-text" style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">
+                        Mempersiapkan...
+                    </div>
+                    <div id="send-step-sub" style="font-size:12px;color:#64748b;">
+                        Mohon tunggu
+                    </div>
+                    <div style="margin-top:16px;background:#e2e8f0;border-radius:10px;height:6px;overflow:hidden;">
+                        <div id="send-progressbar" style="height:6px;background:#2563eb;border-radius:10px;width:0%;transition:width .4s ease;"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:#94a3b8;">
+                        <span>Validasi</span>
+                        <span>Patient ID</span>
+                        <span>Build Payload</span>
+                        <span>Kirim</span>
+                        <span>Selesai</span>
+                    </div>
+                </div>
+
+                <div id="send-result-body" style="display:none;font-size:12px;margin-top:8px;"></div>
+
+            </div>
+            <div class="modal-footer" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <button type="button" class="btn btn-default" id="btn-close-send" data-dismiss="modal" style="display:none;font-size:12px;">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content" style="border-radius:8px;overflow:hidden;">
+            <div class="modal-header" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title" style="font-size:14px;color:#1e293b;"><i class="fa fa-upload" style="color:#2563eb;"></i> Upload Image atau DICOM</h4>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div class="form-group">
+                    <label style="font-size:12px;">No Rawat <span class="text-danger">*</span></label>
+                    <input type="text" id="upload-norawat" class="form-control" placeholder="2026/01/01/000001" value="{?=isset_or($no_rawat_converted)?}" style="font-size:12px;">
+                </div>
+                <div class="form-group">
+                    <label style="font-size:12px;">Modality <span class="text-danger">*</span></label>
+                    <select id="upload-modality" class="form-control" style="font-size:12px;">
+                        <option value="">— Pilih Modality —</option>
+                        <option value="CR">CR (Computed Radiography)</option>
+                        <option value="CT">CT (Computed Tomography)</option>
+                        <option value="MR">MR (Magnetic Resonance)</option>
+                        <option value="US">US (Ultrasound)</option>
+                        <option value="DX">DX (Digital Radiography)</option>
+                        <option value="MG">MG (Mammography)</option>
+                        <option value="PX">PX (Panoramic X-Ray)</option>
+                        <option value="IO">IO (Intra-oral)</option>
+                        <option value="NM">NM (Nuclear Medicine)</option>
+                        <option value="XA">XA (X-Ray Angiography)</option>
+                        <option value="RF">RF (Fluoroscopy)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="font-size:12px;">Study Description</label>
+                    <input type="text" id="upload-studydesc" class="form-control" placeholder="Rontgen Thorax AP..." style="font-size:12px;">
+                    <small class="text-muted">Auto-fill saat pilih Modality</small>
+                </div>
+                <div class="form-group">
+                    <label style="font-size:12px;">File (JPG / PNG / DCM) <span class="text-danger">*</span></label>
+                    <input type="file" id="upload-file" class="form-control" accept=".jpg,.jpeg,.png,.dcm" style="font-size:12px;">
+                </div>
+                <div id="upload-result" style="display:none;border-radius:5px;padding:8px 12px;font-size:12px;margin-top:4px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Batal</button>
+                <button type="button" id="btn-do-upload" class="btn btn-primary" style="background:#2563eb;border:none;">
+                    <i class="fa fa-save"></i> Simpan / Konversi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+var baseURL  = mlite.url + '/' + mlite.admin;
+var noRawatC = '{?=isset_or($no_rawat_converted)?}';
+var mDesc = {
+    'CR':'X-Ray','CT':'CT Scan','MR':'MRI','US':'USG','DX':'Digital X-Ray',
+    'MG':'Mammography','PX':'Panoramic X-Ray','IO':'Intra-oral Radiography',
+    'NM':'Nuclear Medicine','XA':'X-Ray Angiography','RF':'Fluoroscopy'
+};
+var _bright = 100, _invert = false, _viewerInstances = [];
+
+// Viewer filter
+function mpApplyFilter() {
+    var f = 'brightness(' + _bright + '%)' + (_invert ? ' invert(100%)' : '');
+    $('#viewer-img').css('filter', f);
+}
+$('#tb-bright-up').on('click', function() { _bright = Math.min(300, _bright + 20); mpApplyFilter(); });
+$('#tb-bright-dn').on('click', function() { _bright = Math.max(10,  _bright - 20); mpApplyFilter(); });
+$('#tb-invert').on('click', function() { _invert = !_invert; mpApplyFilter(); });
+$('#tb-reset').on('click', function() { _bright = 100; _invert = false; mpApplyFilter(); });
+
+function mpLoadImage(url, idx) {
+    $('#viewer-loading').show();
+    $('#viewer-img').hide();
+    $('.mp-thumb-item').removeClass('active');
+    $('.mp-thumb-item[data-idx="' + idx + '"]').addClass('active');
+    $('#btn-dl-current').off('click').on('click', function() { window.open(url, '_blank'); });
+    var tmpImg = new Image();
+    tmpImg.onload = function() { $('#viewer-loading').hide(); $('#viewer-img').attr('src', url).show(); mpApplyFilter(); };
+    tmpImg.onerror = function() { $('#viewer-loading').html('<i class="fa fa-times" style="color:#dc2626;font-size:24px;"></i><br><span style="font-size:11px;margin-top:6px;display:block;">Gagal memuat</span>'); };
+    tmpImg.src = url;
+}
+
+function openViewer(instances, meta) {
+    _viewerInstances = instances || [];
+    _bright = 100; _invert = false;
+    var m = meta || {};
+    $('#m-name').text(m.name || '-');
+    $('#m-id').text(m.id || '-');
+    $('#m-birth').text(m.birth || '-');
+    $('#m-sex').text(m.sex || '-');
+    $('#m-date').text(m.date || '-');
+    $('#m-time').text(m.time || '-');
+    $('#m-mod').text(m.modality || '-');
+
+    var thumbsEl = $('#viewer-thumbs').empty();
+    $.each(_viewerInstances, function(i, inst) {
+        var itemEl = $('<div>').addClass('mp-thumb-item' + (i === 0 ? ' active' : '')).attr('data-idx', i);
+        var imgEl  = $('<img>').css({'width':'100%','display':'block','background':'#111827'});
+        imgEl.on('error', function() { $(this).css({'height':'60px','object-fit':'none'}); });
+        imgEl.attr('src', inst.url);
+        var labelEl = $('<div>').addClass('mp-thumb-no').text('Image ' + (i + 1));
+        itemEl.data('url', inst.url).data('idx', i);
+        itemEl.append(imgEl).append(labelEl);
+        thumbsEl.append(itemEl);
+    });
+
+    $('#viewer-loading').html('<i class="fa fa-spinner fa-spin" style="font-size:28px;"></i><span style="font-size:12px;margin-top:8px;display:block;">Memuat...</span>');
+    $('#viewer-img').hide().attr('src', '');
+    $('#mpViewerOverlay').addClass('open');
+    if (_viewerInstances.length > 0) mpLoadImage(_viewerInstances[0].url, 0);
+}
+
+$(document).on('click', '.mp-thumb-item', function() {
+    mpLoadImage($(this).data('url'), $(this).data('idx'));
+});
+
+$('#btn-close-viewer').on('click', function() { $('#mpViewerOverlay').removeClass('open'); });
+$('#mpViewerOverlay').on('click', function(e) {
+    if ($(e.target).is('#mpViewerOverlay')) $('#mpViewerOverlay').removeClass('open');
+});
+$('#viewer-img').on('click', function() {
+    var cur = $(this).css('max-height');
+    $(this).css({'max-height': cur === 'none' ? '100%' : 'none', 'cursor': cur === 'none' ? 'zoom-in' : 'zoom-out'});
+});
+
+// Cari
+$('#btn-cari').on('click', function() {
+    var nr = $.trim($('#input-norawat').val()).replace(/\//g, '');
+    if (!nr) return;
+    location.href = baseURL + '/satu_sehat/minipacs/' + nr + '?t=' + mlite.token;
+});
+$('#input-norawat').on('keypress', function(e) { if (e.which === 13) $('#btn-cari').trigger('click'); });
+
+// Auto-fill modality
+$(document).on('change', '.select-mod', function() {
+    var k = $(this).data('key'), m = $(this).val();
+    $('.input-desc[data-key="' + k + '"]').val(mDesc[m] || '');
+});
+$('#upload-modality').on('change', function() {
+    $('#upload-studydesc').val(mDesc[$(this).val()] || '');
+});
+
+// Convert DCM
+$(document).on('click', '.btn-convert', function(e) {
+    e.stopPropagation();
+    var btn = $(this), k = btn.data('key');
+    var mod  = $('.select-mod[data-key="' + k + '"]').val();
+    var desc = $.trim($('.input-desc[data-key="' + k + '"]').val()) || mDesc[mod] || mod;
+    if (!mod) { alert('Pilih Modality terlebih dahulu!'); return; }
+
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+    var statusEl = $('#status-' + k);
+    statusEl.text('Proses...').removeClass('idle ok err').addClass('run');
+
+    $.ajax({
+        url: baseURL + '/satu_sehat/convertdcm?t=' + mlite.token,
+        type: 'POST',
+        data: { no_rawat: btn.data('norawat'), lokasi_gambar: btn.data('lokasi'), modality: mod, study_description: desc },
+        dataType: 'json',
+        success: function(r) {
+            if (r.success) {
+                statusEl.text('Sudah').removeClass('run err').addClass('ok');
+                $('#dcm-info-' + k).html('<span style="color:#16a34a;"><i class="fa fa-check"></i> ' + r.dcm_filename + '</span>');
+                btn.html('<i class="fa fa-refresh"></i> Re-Convert').prop('disabled', false);
+                setTimeout(function() {
+                    location.href = baseURL + '/satu_sehat/minipacs/' + noRawatC.replace(/\//g,'') + '?t=' + mlite.token;
+                }, 2000);
+            } else {
+                statusEl.text('Gagal').removeClass('run ok').addClass('err');
+                $('#dcm-info-' + k).html('<span style="color:#dc2626;font-size:10px;"><i class="fa fa-times"></i> ' + r.message + '</span>');
+                btn.html('<i class="fa fa-refresh"></i> Convert DCM').prop('disabled', false);
+            }
+        },
+        error: function() {
+            statusEl.text('Error').removeClass('run ok').addClass('err');
+            btn.html('<i class="fa fa-refresh"></i> Convert DCM').prop('disabled', false);
+        }
+    });
+});
+
+// Expand study row
+$(document).on('click', '.study-row', function() {
+    var key = $(this).data('key'), sid = $(this).data('study-id');
+    var det  = $('#detail-' + key);
+    var icon = $(this).find('i.fa-chevron-right, i.fa-chevron-down');
+    if (det.is(':visible')) {
+        det.hide(); $(this).removeClass('active');
+        icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+        return;
+    }
+    $('.mp-detail-row').hide(); $('.study-row').removeClass('active');
+    $('.fa-chevron-down').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+    det.show(); $(this).addClass('active');
+    icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+    var box = $('#series-table-' + key);
+    if (box.data('loaded')) return;
+    $.ajax({
+        url: baseURL + '/satu_sehat/seriesdetail/' + sid + '?t=' + mlite.token,
+        success: function(res) {
+            if (res.success) { box.html(res.html); box.data('loaded', true); }
+            else box.html('<div style="padding:12px;color:#dc2626;">Gagal memuat data series</div>');
+        }
+    });
+});
+
+// Preview study
+$(document).on('click', '.btn-preview-study', function(e) {
+    e.stopPropagation();
+    var sid = $(this).data('study-id');
+    $.ajax({
+        url: baseURL + '/satu_sehat/seriesdetail/' + sid + '?t=' + mlite.token,
+        success: function(res) {
+            if (!res.success || !res.all_instances || !res.all_instances.length) {
+                alert('Tidak ada file DCM untuk di-preview'); return;
+            }
+            openViewer(res.all_instances, res.meta);
+        }
+    });
+});
+
+// ===== KIRIM KE SATU SEHAT — POST/PUT ImagingStudy dengan progress =====
+function setSendProgress(pct, stepText, subText) {
+    $('#send-progressbar').css('width', pct + '%');
+    $('#send-step-text').text(stepText);
+    $('#send-step-sub').text(subText || '');
+}
+
+function setSendDone(success, title, sub) {
+    $('#send-spinner i').removeClass('fa-circle-o-notch fa-spin')
+        .addClass(success ? 'fa-check-circle' : 'fa-times-circle')
+        .css('color', success ? '#10b981' : '#ef4444');
+    $('#send-step-text').text(title).css('color', success ? '#166534' : '#991b1b');
+    $('#send-step-sub').text(sub || '');
+    $('#send-progressbar').css({'width': success ? '100%' : $('#send-progressbar').css('width'), 'background': success ? '#10b981' : '#ef4444'});
+}
+
+function resetSendProgress() {
+    $('#send-spinner i').removeClass('fa-check-circle fa-times-circle')
+        .addClass('fa-circle-o-notch fa-spin').css('color', '#2563eb');
+    $('#send-progressbar').css({'width':'0%','background':'#2563eb'});
+    $('#send-step-text').text('Mempersiapkan...').css('color','#1e293b');
+    $('#send-step-sub').text('Mohon tunggu');
+    $('#send-progress-wrap').show();
+    $('#send-result-body').hide().html('');
+    $('#btn-close-send').hide();
+}
+
+$(document).on('click', '.btn-send-imaging', function(e) {
+    e.stopPropagation();
+    var btn     = $(this);
+    var studyId = btn.data('study-id');
+    var noRawat = btn.data('norawat');
+
+    if (!confirm('Kirim ImagingStudy ke Satu Sehat?\n\nJika sudah pernah dikirim, data akan di-UPDATE (PUT) dengan DCM terbaru.')) return;
+
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+    // Reset progress & buka modal
+    resetSendProgress();
+    $('#sendResultModal').modal('show');
+
+    // Tunggu modal fully shown, baru jalankan progress
+    $('#sendResultModal').one('shown.bs.modal', function() {
+
+        // Step 1: Validasi (0% → 20%)
+        setSendProgress(0, 'Validasi data lokal...', 'Memeriksa encounter, service request, dan file DCM');
+        setTimeout(function() {
+            setSendProgress(20, 'Validasi selesai', 'Data lokal OK');
+
+            // Step 2: Patient ID (20% → 40%)
+            setTimeout(function() {
+                setSendProgress(40, 'Mengambil Patient ID Satu Sehat...', 'Mencari via NIK pasien');
+
+                // Step 3: Build payload (40% → 60%)
+                setTimeout(function() {
+                    setSendProgress(60, 'Membangun FHIR ImagingStudy payload...', 'Menyiapkan data instances dan series');
+
+                    // Step 4: Kirim AJAX (60% → 80%)
+                    setTimeout(function() {
+                        setSendProgress(80, 'Mengirim ke Satu Sehat...', 'Menunggu response dari server');
+
+                        $.ajax({
+                            url: baseURL + '/satu_sehat/sendimagingstudy?t=' + mlite.token,
+                            type: 'POST',
+                            data: { study_id: studyId, no_rawat: noRawat },
+                            dataType: 'json',
+                            success: function(res) {
+                                if (res.success) {
+                                    // Step 5: Simpan (80% → 100%)
+                                    setSendProgress(90, 'Menyimpan response...', 'Memperbarui database lokal');
+                                    setTimeout(function() {
+                                        setSendDone(true,
+                                            res.aksi === 'UPDATE' ? 'UPDATE Sukses!' : 'CREATE Sukses!',
+                                            res.message
+                                        );
+
+                                        var aksiInfo = res.aksi === 'UPDATE'
+                                            ? '<div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:4px;padding:8px 12px;font-size:11px;margin-bottom:8px;color:#1e40af;">'
+                                              + '<i class="fa fa-sync-alt"></i> <strong>PUT</strong> — ImagingStudy diperbarui dengan ' + res.response.numberOfInstances + ' instance DCM terbaru'
+                                              + '</div>'
+                                            : '<div style="background:#f0fdf4;border-left:3px solid #10b981;border-radius:4px;padding:8px 12px;font-size:11px;margin-bottom:8px;color:#166534;">'
+                                              + '<i class="fa fa-plus-circle"></i> <strong>POST</strong> — ImagingStudy baru berhasil dibuat'
+                                              + '</div>';
+
+                                        var bodyHtml = aksiInfo
+                                            + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-top:8px;">'
+                                            + '<div style="font-size:11px;color:#64748b;margin-bottom:4px;">ID ImagingStudy:</div>'
+                                            + '<code style="font-size:12px;color:#1e293b;">' + res.id_imaging_study + '</code>'
+                                            + '</div>';
+
+                                        if (res.response) {
+                                            bodyHtml += '<details style="margin-top:10px;">'
+                                                + '<summary style="font-size:11px;color:#64748b;cursor:pointer;padding:4px 0;">Lihat FHIR Response lengkap</summary>'
+                                                + '<pre style="background:#0f172a;color:#94a3b8;border-radius:6px;padding:12px;font-size:10px;max-height:200px;overflow:auto;margin-top:8px;">'
+                                                + JSON.stringify(res.response, null, 2)
+                                                + '</pre></details>';
+                                        }
+
+                                        $('#send-result-body').html(bodyHtml).show();
+                                        $('#btn-close-send').show();
+                                        btn.html('<i class="fa fa-check"></i>').prop('disabled', false);
+                                    }, 600);
+                                } else {
+                                    setSendDone(false, 'Gagal!', res.message);
+
+                                    var errHtml = '<div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:4px;padding:10px 12px;font-size:12px;color:#991b1b;margin-bottom:8px;">'
+                                        + '<i class="fa fa-times-circle"></i> ' + res.message
+                                        + '</div>';
+
+                                    if (res.patient_resp) {
+                                        errHtml += '<details><summary style="font-size:11px;color:#64748b;cursor:pointer;">Debug info</summary>'
+                                            + '<pre style="font-size:10px;background:#f8fafc;padding:8px;border-radius:4px;margin-top:6px;">' + res.patient_resp + '</pre></details>';
+                                    }
+
+                                    $('#send-result-body').html(errHtml).show();
+                                    $('#btn-close-send').show();
+                                    btn.html('<i class="fa fa-send"></i>').prop('disabled', false);
+                                }
+                            },
+                            error: function() {
+                                setSendDone(false, 'AJAX Error!', 'Koneksi gagal');
+                                $('#send-result-body').html('<div style="background:#fef2f2;border-radius:5px;padding:10px;color:#991b1b;font-size:12px;"><i class="fa fa-times-circle"></i> Koneksi gagal. Coba lagi.</div>').show();
+                                $('#btn-close-send').show();
+                                btn.html('<i class="fa fa-send"></i>').prop('disabled', false);
+                            }
+                        });
+                    }, 400);
+                }, 500);
+            }, 500);
+        }, 300);
+    });
+});
+// Hapus study
+$(document).on('click', '.btn-delete-study', function(e) {
+    e.stopPropagation();
+    if (!confirm('Hapus study ini beserta semua file DCM?')) return;
+    $.ajax({
+        url: baseURL + '/satu_sehat/deletestudy?t=' + mlite.token,
+        type: 'POST', data: { study_id: $(this).data('study-id') }, dataType: 'json',
+        success: function(r) {
+            if (r.success) location.href = baseURL + '/satu_sehat/minipacs/' + noRawatC.replace(/\//g,'') + '?t=' + mlite.token;
+        }
+    });
+});
+
+// Upload modal
+$('#btn-upload-modal').on('click', function() { $('#upload-result').hide(); $('#uploadModal').modal('show'); });
+$('#btn-do-upload').on('click', function() {
+    var nr  = $.trim($('#upload-norawat').val());
+    var mod = $('#upload-modality').val();
+    var dsc = $.trim($('#upload-studydesc').val()) || mDesc[mod] || mod;
+    var fi  = $('#upload-file')[0];
+    if (!nr || !mod || !fi.files.length) { alert('Lengkapi semua field!'); return; }
+
+    var fd = new FormData();
+    fd.append('no_rawat', nr); fd.append('modality', mod);
+    fd.append('study_description', dsc); fd.append('file', fi.files[0]);
+
+    $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+    $.ajax({
+        url: baseURL + '/satu_sehat/uploaddicom?t=' + mlite.token,
+        type: 'POST', data: fd, processData: false, contentType: false, dataType: 'json',
+        success: function(r) {
+            var resEl = $('#upload-result');
+            if (r.success) {
+                resEl.css({'background':'#f0fdf4','color':'#166534','border':'1px solid #bbf7d0'}).html('<i class="fa fa-check"></i> ' + r.message).show();
+                setTimeout(function() {
+                    $('#uploadModal').modal('hide');
+                    location.href = baseURL + '/satu_sehat/minipacs/' + (r.no_rawat_converted || nr).replace(/\//g,'') + '?t=' + mlite.token;
+                }, 1500);
+            } else {
+                resEl.css({'background':'#fef2f2','color':'#991b1b','border':'1px solid #fecaca'}).html('<i class="fa fa-times"></i> ' + r.message).show();
+            }
+        },
+        complete: function() { $('#btn-do-upload').prop('disabled', false).html('<i class="fa fa-save"></i> Simpan / Konversi'); }
+    });
+});
+</script>

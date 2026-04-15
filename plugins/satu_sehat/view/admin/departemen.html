@@ -1,0 +1,167 @@
+<style>
+    .nowrap th, .nowrap td { white-space: nowrap; }
+    .panel-form .panel-heading { background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
+    .panel-form .panel-title { font-size: 13px; font-weight: 600; color: #555; letter-spacing: 0.3px; }
+    .form-label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; display: block; }
+    .selected-info { background: #f0f7ff; border: 1px solid #c8e0f7; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #2c6fa0; display: none; }
+    .selected-info strong { display: block; margin-bottom: 4px; color: #1a4f7a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .selected-info .info-val { font-family: monospace; font-size: 11px; word-break: break-all; }
+    tr.mapping_departemen { cursor: pointer; }
+    tr.mapping_departemen:hover td { background-color: #f5faff !important; }
+    tr.mapping_departemen.selected td { background-color: #ddeeff !important; }
+    .btn-action { margin-right: 4px; }
+    .id-cell { font-family: monospace; font-size: 11px; color: #666; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .divider-form { border: none; border-top: 1px solid #eee; margin: 14px 0; }
+</style>
+
+<h4 style="margin-bottom: 16px;">Mapping Departemen Satu Sehat</h4>
+
+<form action="{?=url(ADMIN.'/satu_sehat/savedepartemen')?}" method="POST">
+    <input type="hidden" name="id_organisasi_satusehat" id="id_organisasi_satusehat">
+
+    <div class="panel panel-default panel-form">
+        <div class="panel-heading">
+            <h3 class="panel-title">Form Mapping Departemen</h3>
+        </div>
+        <div class="panel-body">
+
+            <!-- Info row yang dipilih -->
+            <div class="selected-info" id="selected-info">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Departemen Terpilih</strong>
+                        <span class="info-val" id="show_dep">-</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>ID Organisasi Satu Sehat</strong>
+                        <span class="info-val" id="show_org">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-5">
+                    <div class="form-group">
+                        <label class="form-label">ID Departemen</label>
+                        <select name="dep_id" id="dep_id" class="form-control input-sm" onchange="onDepChange(this)">
+                            {loop: $departemen}
+                            <option value="{?=isset_or($value.dep_id)?}">
+                                [{?=isset_or($value.dep_id)?}] &mdash; {?=isset_or($value.nama)?}
+                            </option>
+                            {/loop}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nama Departemen</label>
+                        <input type="text" name="nama" id="nama_departemen" class="form-control input-sm" value="" required />
+                    </div>
+                </div>
+
+                <div class="col-md-5">
+                    <div class="form-group">
+                        <label class="form-label">Keterangan</label>
+                        <div style="background:#fffbe6; border:1px solid #ffe58f; border-radius:6px; padding:10px 12px; font-size:12px; color:#7d5a00;">
+                            <i class="fa fa-info-circle"></i>
+                            Klik baris pada tabel untuk memilih data yang akan diupdate atau dihapus. Untuk simpan baru, pilih departemen dan klik <strong>Simpan</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" class="btn btn-default btn-sm btn-block" onclick="resetForm()">
+                        <i class="fa fa-refresh"></i> Reset
+                    </button>
+                </div>
+            </div>
+
+            <hr class="divider-form">
+
+            <div>
+                <input type="submit" name="simpan" class="btn btn-success btn-sm btn-action" value="Simpan" />
+                <input type="submit" name="update" class="btn btn-info btn-sm btn-action" value="Update" />
+                <input type="submit" name="hapus" class="btn btn-danger btn-sm btn-action" value="Hapus"
+                    onclick="return confirm('Yakin hapus data ini?')" />
+            </div>
+
+        </div>
+    </div>
+</form>
+
+<!-- Tabel -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title" style="font-size:13px; font-weight:600; color:#555;">
+            Data Mapping Departemen
+            <span class="badge" id="total-badge" style="margin-left:6px; background:#888;"></span>
+        </h3>
+    </div>
+    <div class="panel-body no-padding">
+        <div class="table-responsive" id="mapping_departemen">
+            <table class="table table-striped table-bordered table-hover no-margin nowrap dataTables" width="100%">
+                <thead>
+                <tr>
+                    <th style="width:80px;">ID Dep.</th>
+                    <th>Nama Departemen</th>
+                    <th>ID Organisasi Satu Sehat</th>
+                </tr>
+                </thead>
+                <tbody>
+                {loop: $satu_sehat_departemen}
+                <tr class="mapping_departemen"
+                    data-dep_id="{?=isset_or($value.dep_id)?}"
+                    data-nama="{?=isset_or($value.nama)?}"
+                    data-id_organisasi_satusehat="{?=isset_or($value.id_organisasi_satusehat)?}">
+                    <td><span class="label label-default">{?=isset_or($value.dep_id)?}</span></td>
+                    <td>{?=isset_or($value.nama)?}</td>
+                    <td class="id-cell">{?=isset_or($value.id_organisasi_satusehat)?}</td>
+                </tr>
+                {/loop}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+function onDepChange(sel) {
+    var text = sel.options[sel.selectedIndex].text;
+    var nama = text.split('— ')[1] || text;
+    document.getElementById('nama_departemen').value = nama.trim();
+}
+
+function resetForm() {
+    document.getElementById('id_organisasi_satusehat').value = '';
+    document.getElementById('show_dep').innerText  = '-';
+    document.getElementById('show_org').innerText  = '-';
+    document.getElementById('selected-info').style.display = 'none';
+    $('#dep_id').val($('#dep_id option:first').val()).trigger('change');
+    $('.mapping_departemen').removeClass('selected');
+}
+
+$("#mapping_departemen").on("click", ".mapping_departemen", function () {
+    var dep_id  = $(this).attr('data-dep_id');
+    var nama    = $(this).attr('data-nama');
+    var org     = $(this).attr('data-id_organisasi_satusehat');
+
+    // Highlight
+    $('.mapping_departemen').removeClass('selected');
+    $(this).addClass('selected');
+
+    // Set form
+    $('#dep_id').val(dep_id);
+    $('#nama_departemen').val(nama);
+    $('#id_organisasi_satusehat').val(org);
+
+    // Info box
+    document.getElementById('show_dep').innerText = dep_id + ' — ' + nama;
+    document.getElementById('show_org').innerText = org || '-';
+    document.getElementById('selected-info').style.display = 'block';
+});
+
+$(document).ready(function () {
+    var total = $('#mapping_departemen tbody tr').length;
+    $('#total-badge').text(total + ' data');
+    onDepChange(document.getElementById('dep_id'));
+});
+</script>

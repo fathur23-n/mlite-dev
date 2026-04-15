@@ -1,0 +1,277 @@
+<style>
+    .nowrap th, .nowrap td { white-space: nowrap; }
+    .panel-form .panel-heading { background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
+    .panel-form .panel-title { font-size: 13px; font-weight: 600; color: #555; letter-spacing: 0.3px; }
+    .selected-info { background: #f0f7ff; border: 1px solid #c8e0f7; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #2c6fa0; display: none; }
+    .selected-info strong { display: block; margin-bottom: 4px; color: #1a4f7a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .selected-info .info-val { font-family: monospace; font-size: 11px; word-break: break-all; }
+    tr.mapping_lokasi { cursor: pointer; }
+    tr.mapping_lokasi:hover td { background-color: #f5faff !important; }
+    tr.mapping_lokasi.selected td { background-color: #ddeeff !important; }
+    .btn-action { margin-right: 4px; }
+    .form-label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; }
+    .divider-form { border: none; border-top: 1px solid #eee; margin: 14px 0; }
+    .id-cell { font-family: monospace; font-size: 11px; color: #666; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .tipe-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+    .tipe-ralan    { background: #d4edda; color: #155724; }
+    .tipe-ranap    { background: #cce5ff; color: #004085; }
+    .tipe-depo     { background: #fff3cd; color: #856404; }
+    .tipe-ruanglab { background: #f8d7da; color: #721c24; }
+    .tipe-labpa    { background: #f5c6cb; color: #721c24; }
+    .tipe-ok       { background: #e2d9f3; color: #432874; }
+    .tipe-rad      { background: #d1ecf1; color: #0c5460; }
+</style>
+
+<h4 style="margin-bottom: 16px;">Mapping Lokasi Satu Sehat</h4>
+
+<form action="{?=url(ADMIN.'/satu_sehat/savelokasi')?}" method="POST">
+    <input type="hidden" name="id_lokasi_satusehat" id="id_lokasi_satusehat">
+    <input type="hidden" name="id_organisasi_satusehat" id="id_organisasi_satusehat">
+
+    <div class="panel panel-default panel-form">
+        <div class="panel-heading">
+            <h3 class="panel-title">Form Mapping Lokasi</h3>
+        </div>
+        <div class="panel-body">
+
+            <!-- Info row yang sedang dipilih -->
+            <div class="selected-info" id="selected-info">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>ID Organisasi Satu Sehat</strong>
+                        <span class="info-val" id="show_org">-</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>ID Lokasi Satu Sehat</strong>
+                        <span class="info-val" id="show_lokasi">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Tipe Lokasi -->
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label class="form-label">Tipe Lokasi <span class="text-danger">*</span></label>
+                        <select name="tipe" id="tipe" class="form-control input-sm">
+                            <option value="ralan">Rawat Jalan</option>
+                            <option value="ranap">Rawat Inap</option>
+                            <option value="ruanglab">Lab PK</option>
+                            <option value="labpa">Lab PA</option>
+                            <option value="ok">OK / Kamar Operasi</option>
+                            <option value="rad">Radiologi</option>
+                            <option value="depo">Depo Farmasi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Poli / Unit / Bangsal -->
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label class="form-label">Poli / Unit / Bangsal</label>
+                        <select name="kode" id="kode" class="form-control input-sm">
+                            <optgroup label="— Rawat Jalan (Poli)">
+                                {loop: $lokasi}
+                                {if: substr($value.kode, 0, 1) == 'U'}
+                                <option value="{?=isset_or($value.kode)?}">
+                                    {?=isset_or($value.kode)?} &mdash; {?=isset_or($value.nama)?}
+                                </option>
+                                {/if}
+                                {/loop}
+                            </optgroup>
+                            <optgroup label="— Rawat Inap / Bangsal">
+                                {loop: $lokasi}
+                                {if: substr($value.kode, 0, 1) != 'U'}
+                                <option value="{?=isset_or($value.kode)?}">
+                                    {?=isset_or($value.kode)?} &mdash; {?=isset_or($value.nama)?}
+                                </option>
+                                {/if}
+                                {/loop}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Departemen -->
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Departemen Satu Sehat</label>
+                        <select name="dep_id" id="dep_id" class="form-control input-sm" onchange="onDepChange(this)">
+                            {loop: $satu_sehat_departemen}
+                            <option value="{?=isset_or($value.dep_id)?}"
+                                data-org="{?=isset_or($value.id_organisasi_satusehat)?}">
+                                {?=isset_or($value.dep_id)?} &mdash; {?=isset_or($value.nama)?}
+                            </option>
+                            {/loop}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Reset -->
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="button" class="btn btn-default btn-sm btn-block" onclick="resetForm()">
+                            <i class="fa fa-refresh"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Longitude, Latitude, Altitude -->
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Longitude</label>
+                        <input type="text" name="longitude" id="longitude" class="form-control input-sm" placeholder="-7.4543214">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Latitude</label>
+                        <input type="text" name="latitude" id="latitude" class="form-control input-sm" placeholder="112.4510394">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Altitude</label>
+                        <input type="text" name="altittude" id="altittude" class="form-control input-sm" placeholder="20.5537957">
+                    </div>
+                </div>
+            </div>
+
+            <hr class="divider-form">
+
+            <div class="row">
+                <div class="col-md-12">
+                    <input type="submit" name="simpan" class="btn btn-success btn-sm btn-action" value="Simpan" />
+                    <input type="submit" name="update" class="btn btn-info btn-sm btn-action" value="Update" />
+                    <input type="submit" name="hapus" class="btn btn-danger btn-sm btn-action" value="Hapus"
+                    onclick="return confirm('Yakin hapus data ini?')" />
+                </div>
+            </div>
+
+        </div>
+    </div>
+</form>
+
+<!-- Tabel -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title" style="font-size:13px; font-weight:600; color:#555;">
+            Data Mapping Lokasi
+            <span class="badge" id="total-badge" style="margin-left:6px; background:#888;"></span>
+        </h3>
+    </div>
+    <div class="panel-body no-padding">
+        <div class="table-responsive" id="mapping_lokasi">
+            <table class="table table-striped table-bordered table-hover no-margin nowrap dataTables" width="100%">
+                <thead>
+                <tr>
+                    <th style="width:60px;">Kode</th>
+                    <th style="width:80px;">Tipe</th>
+                    <th>Nama / No. Kamar</th>
+                    <th>ID Organisasi</th>
+                    <th>ID Lokasi</th>
+                    <th style="width:80px;">Longitude</th>
+                    <th style="width:80px;">Latitude</th>
+                    <th style="width:70px;">Altitude</th>
+                </tr>
+                </thead>
+                <tbody>
+                {loop: $satu_sehat_lokasi}
+                <tr class="mapping_lokasi"
+                    data-dep_id="{?=isset_or($value.dep_id)?}"
+                    data-tipe="{?=isset_or($value.tipe)?}"
+                    data-kode_lokasi="{?=isset_or($value.kode_lokasi)?}"
+                    data-org="{?=isset_or($value.id_organisasi_satusehat)?}"
+                    data-id_lokasi="{?=isset_or($value.id_lokasi_satusehat)?}"
+                    data-longitude="{?=isset_or($value.longitude)?}"
+                    data-latitude="{?=isset_or($value.latitude)?}"
+                    data-altittude="{?=isset_or($value.altittude)?}">
+                    <td><span class="label label-default">{?=isset_or($value.dep_id)?}</span></td>
+                    <td><span class="tipe-badge tipe-{?=isset_or($value.tipe)?}">{?=isset_or($value.tipe)?}</span></td>
+                    <td>{?=isset_or($value.display_nama)?}</td>
+                    <td class="id-cell">{?=isset_or($value.id_organisasi_satusehat)?}</td>
+                    <td class="id-cell">{?=isset_or($value.id_lokasi_satusehat)?}</td>
+                    <td>{?=isset_or($value.longitude)?}</td>
+                    <td>{?=isset_or($value.latitude)?}</td>
+                    <td>{?=isset_or($value.altittude)?}</td>
+                </tr>
+                {/loop}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+function onDepChange(sel) {
+    var org = sel.options[sel.selectedIndex].getAttribute('data-org') || '';
+    document.getElementById('id_organisasi_satusehat').value = org;
+}
+
+function resetForm() {
+    document.getElementById('id_lokasi_satusehat').value = '';
+    document.getElementById('id_organisasi_satusehat').value = '';
+    document.getElementById('longitude').value = '';
+    document.getElementById('latitude').value  = '';
+    document.getElementById('altittude').value = '';
+    document.getElementById('show_org').innerText    = '-';
+    document.getElementById('show_lokasi').innerText = '-';
+    document.getElementById('selected-info').style.display = 'none';
+    $('#tipe').val('ralan');
+    $('#kode').val($('#kode option:first').val());
+    $('#dep_id').val($('#dep_id option:first').val());
+    onDepChange(document.getElementById('dep_id'));
+    $('.mapping_lokasi').removeClass('selected');
+}
+
+$("#mapping_lokasi").on("click", ".mapping_lokasi", function () {
+    var dep_id      = $(this).attr('data-dep_id');
+    var tipe        = $(this).attr('data-tipe');
+    var kode_lokasi = $(this).attr('data-kode_lokasi');
+    var org         = $(this).attr('data-org');
+    var id_lokasi   = $(this).attr('data-id_lokasi');
+    var longitude   = $(this).attr('data-longitude');
+    var latitude    = $(this).attr('data-latitude');
+    var altittude   = $(this).attr('data-altittude');
+
+    // Highlight
+    $('.mapping_lokasi').removeClass('selected');
+    $(this).addClass('selected');
+
+    // Hidden fields
+    $('#id_lokasi_satusehat').val(id_lokasi);
+    $('#id_organisasi_satusehat').val(org);
+
+    // Koordinat
+    $('#longitude').val(longitude || '');
+    $('#latitude').val(latitude   || '');
+    $('#altittude').val(altittude || '');
+
+    // Info box
+    document.getElementById('show_org').innerText    = org || '-';
+    document.getElementById('show_lokasi').innerText = id_lokasi || '-';
+    document.getElementById('selected-info').style.display = 'block';
+
+    // Select tipe
+    if (tipe) $('#tipe').val(tipe);
+
+    // Select kode
+    if (kode_lokasi && $('#kode option[value="' + kode_lokasi + '"]').length) {
+        $('#kode').val(kode_lokasi);
+    }
+
+    // Select departemen
+    $('#dep_id').val(dep_id);
+    onDepChange(document.getElementById('dep_id'));
+});
+
+// Total badge
+$(document).ready(function () {
+    var total = $('#mapping_lokasi tbody tr').length;
+    $('#total-badge').text(total + ' data');
+    onDepChange(document.getElementById('dep_id'));
+});
+</script>

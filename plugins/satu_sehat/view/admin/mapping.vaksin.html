@@ -1,0 +1,310 @@
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <div class="pull-right" style="margin-top:-4px;">
+            <button class="btn btn-primary btn-sm" id="btn-tambah-vaksin">
+                <i class="fa fa-plus"></i> Tambah Mapping Vaksin
+            </button>
+        </div>
+        <h3 class="panel-title">
+            <i class="fa fa-medkit"></i> Mapping Vaksin Satu Sehat
+        </h3>
+    </div>
+    <div class="panel-body">
+
+        <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover" id="tbl-vaksin" style="font-size:12px;">
+            <thead>
+                <tr style="background:#f1f5f9;">
+                    <th>Kode Lokal</th>
+                    <th>Nama Obat Lokal</th>
+                    <th>Kode Vaksin KFA</th>
+                    <th>Nama Vaksin</th>
+                    <th>Kode Route</th>
+                    <th>Nama Route</th>
+                    <th>Dose Code</th>
+                    <th>Dose Unit</th>
+                    <th style="width:90px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {if: count($mapping_vaksin) > 0}
+                {loop: $mapping_vaksin}
+                <tr>
+                    <td style="font-family:monospace;">{?=isset_or($value.kode_brng)?}</td>
+                    <td><strong>{?=isset_or($value.nama_brng)?}</strong></td>
+                    <td style="font-family:monospace;">{?=isset_or($value.vaksin_code)?}</td>
+                    <td>{?=isset_or($value.vaksin_display)?}</td>
+                    <td style="font-family:monospace;">{?=isset_or($value.route_code)?}</td>
+                    <td>{?=isset_or($value.route_display)?}</td>
+                    <td style="font-family:monospace;">{?=isset_or($value.dose_quantity_code)?}</td>
+                    <td>{?=isset_or($value.dose_quantity_unit)?}</td>
+                    <td>
+                        <button class="btn btn-xs btn-warning btn-edit-vaksin"
+                                data-kode="{?=isset_or($value.kode_brng)?}"
+                                data-nama="{?=isset_or($value.nama_brng)?}"
+                                data-vaksin-code="{?=isset_or($value.vaksin_code)?}"
+                                data-vaksin-system="{?=isset_or($value.vaksin_system)?}"
+                                data-vaksin-display="{?=isset_or($value.vaksin_display)?}"
+                                data-route-code="{?=isset_or($value.route_code)?}"
+                                data-route-system="{?=isset_or($value.route_system)?}"
+                                data-route-display="{?=isset_or($value.route_display)?}"
+                                data-dose-code="{?=isset_or($value.dose_quantity_code)?}"
+                                data-dose-system="{?=isset_or($value.dose_quantity_system)?}"
+                                data-dose-unit="{?=isset_or($value.dose_quantity_unit)?}"
+                                title="Edit">
+                            <i class="fa fa-edit"></i>
+                        </button>
+                        <button class="btn btn-xs btn-danger btn-delete-vaksin"
+                                data-kode="{?=isset_or($value.kode_brng)?}"
+                                data-nama="{?=isset_or($value.nama_brng)?}"
+                                title="Hapus">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {/loop}
+                {/if}
+                {if: count($mapping_vaksin) == 0}
+                <tr>
+                    <td colspan="9" class="text-center text-muted" style="padding:20px;">
+                        <i class="fa fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+                        Belum ada mapping vaksin. Klik tombol <strong>Tambah Mapping Vaksin</strong> untuk menambahkan.
+                    </td>
+                </tr>
+                {/if}
+            </tbody>
+        </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal Form Mapping Vaksin -->
+<div class="modal fade" id="modalVaksin" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title" id="modal-vaksin-title">
+                    <i class="fa fa-medkit"></i> Tambah Mapping Vaksin
+                </h4>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="v-mode" value="add">
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Obat / Vaksin Lokal <span class="text-danger">*</span></label>
+                            <select id="v-kode-brng" class="form-control" style="font-size:12px;">
+                                <option value="">— Pilih Obat/Vaksin —</option>
+                                {loop: $databarang}
+                                <option value="{?=isset_or($value.kode_brng)?}">{?=isset_or($value.kode_brng)?} — {?=isset_or($value.nama_brng)?}</option>
+                                {/loop}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="margin:12px 0;">
+                <p style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Vaccine Code (KFA)</p>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Kode Vaksin KFA <span class="text-danger">*</span></label>
+                            <input type="text" id="v-vaksin-code" class="form-control" style="font-size:12px;" placeholder="Contoh: 92000123">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">System</label>
+                            <input type="text" id="v-vaksin-system" class="form-control" style="font-size:12px;" value="http://sys-ids.kemkes.go.id/kfa">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Display / Nama Vaksin</label>
+                            <input type="text" id="v-vaksin-display" class="form-control" style="font-size:12px;" placeholder="Nama lengkap vaksin">
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="margin:12px 0;">
+                <p style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Route (Jalur Pemberian)</p>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Kode Route</label>
+                            <input type="text" id="v-route-code" class="form-control" style="font-size:12px;" placeholder="Contoh: C28161">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">System Route</label>
+                            <input type="text" id="v-route-system" class="form-control" style="font-size:12px;" value="http://www.whocc.no/atc">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Display Route</label>
+                            <input type="text" id="v-route-display" class="form-control" style="font-size:12px;" placeholder="Contoh: Intramuscular">
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="margin:12px 0;">
+                <p style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Dose Quantity (Satuan Dosis)</p>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Kode Satuan</label>
+                            <input type="text" id="v-dose-code" class="form-control" style="font-size:12px;" placeholder="Contoh: mL">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">System Satuan</label>
+                            <input type="text" id="v-dose-system" class="form-control" style="font-size:12px;" value="http://unitsofmeasure.org">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label style="font-size:12px;">Unit / Nama Satuan</label>
+                            <input type="text" id="v-dose-unit" class="form-control" style="font-size:12px;" placeholder="Contoh: mililiter">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="vaksin-result" style="display:none;border-radius:5px;padding:8px 12px;font-size:12px;margin-top:4px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary" id="btn-save-vaksin">
+                    <i class="fa fa-save"></i> Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+var baseURL = mlite.url + '/' + mlite.admin;
+
+// Tambah mapping
+$('#btn-tambah-vaksin').on('click', function() {
+    $('#modal-vaksin-title').html('<i class="fa fa-plus"></i> Tambah Mapping Vaksin');
+    $('#v-mode').val('add');
+    $('#v-kode-brng').val('').prop('disabled', false);
+    $('#v-vaksin-code').val('');
+    $('#v-vaksin-system').val('http://sys-ids.kemkes.go.id/kfa');
+    $('#v-vaksin-display').val('');
+    $('#v-route-code').val('');
+    $('#v-route-system').val('http://www.whocc.no/atc');
+    $('#v-route-display').val('');
+    $('#v-dose-code').val('');
+    $('#v-dose-system').val('http://unitsofmeasure.org');
+    $('#v-dose-unit').val('');
+    $('#vaksin-result').hide().html('');
+    $('#modalVaksin').modal('show');
+});
+
+// Edit mapping
+$(document).on('click', '.btn-edit-vaksin', function() {
+    var btn = $(this);
+    $('#modal-vaksin-title').html('<i class="fa fa-edit"></i> Edit Mapping Vaksin — ' + btn.data('nama'));
+    $('#v-mode').val('edit');
+    $('#v-kode-brng').val(btn.data('kode')).prop('disabled', true);
+    $('#v-vaksin-code').val(btn.data('vaksin-code'));
+    $('#v-vaksin-system').val(btn.data('vaksin-system') || 'http://sys-ids.kemkes.go.id/kfa');
+    $('#v-vaksin-display').val(btn.data('vaksin-display'));
+    $('#v-route-code').val(btn.data('route-code'));
+    $('#v-route-system').val(btn.data('route-system') || 'http://www.whocc.no/atc');
+    $('#v-route-display').val(btn.data('route-display'));
+    $('#v-dose-code').val(btn.data('dose-code'));
+    $('#v-dose-system').val(btn.data('dose-system') || 'http://unitsofmeasure.org');
+    $('#v-dose-unit').val(btn.data('dose-unit'));
+    $('#vaksin-result').hide().html('');
+    $('#modalVaksin').modal('show');
+});
+
+// Simpan
+$('#btn-save-vaksin').on('click', function() {
+    var kode = $('#v-kode-brng').val();
+    var code = $.trim($('#v-vaksin-code').val());
+    if (!kode) { alert('Pilih obat/vaksin lokal terlebih dahulu!'); return; }
+    if (!code) { alert('Kode Vaksin KFA wajib diisi!'); return; }
+
+    $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Menyimpan...');
+
+    $.ajax({
+        url: baseURL + '/satu_sehat/savevaksin?t=' + mlite.token,
+        type: 'POST',
+        data: {
+            kode_brng:            kode,
+            vaksin_code:          code,
+            vaksin_system:        $('#v-vaksin-system').val(),
+            vaksin_display:       $('#v-vaksin-display').val(),
+            route_code:           $('#v-route-code').val(),
+            route_system:         $('#v-route-system').val(),
+            route_display:        $('#v-route-display').val(),
+            dose_quantity_code:   $('#v-dose-code').val(),
+            dose_quantity_system: $('#v-dose-system').val(),
+            dose_quantity_unit:   $('#v-dose-unit').val(),
+        },
+        dataType: 'json',
+        success: function(res) {
+            var el = $('#vaksin-result');
+            if (res.success) {
+                el.css({'background':'#f0fdf4','color':'#166534','border':'1px solid #bbf7d0'})
+                  .html('<i class="fa fa-check"></i> ' + res.message).show();
+                setTimeout(function() {
+                    $('#modalVaksin').modal('hide');
+                    location.reload();
+                }, 1200);
+            } else {
+                el.css({'background':'#fef2f2','color':'#991b1b','border':'1px solid #fecaca'})
+                  .html('<i class="fa fa-times"></i> ' + res.message).show();
+            }
+        },
+        error: function() {
+            $('#vaksin-result').css({'background':'#fef2f2','color':'#991b1b','border':'1px solid #fecaca'})
+                .html('<i class="fa fa-times"></i> AJAX error').show();
+        },
+        complete: function() {
+            $('#btn-save-vaksin').prop('disabled', false).html('<i class="fa fa-save"></i> Simpan');
+        }
+    });
+});
+
+// Hapus
+$(document).on('click', '.btn-delete-vaksin', function() {
+    var kode = $(this).data('kode');
+    var nama = $(this).data('nama');
+    if (!confirm('Hapus mapping vaksin untuk:\n' + nama + ' (' + kode + ')?')) return;
+
+    $.ajax({
+        url: baseURL + '/satu_sehat/deletevaksin?t=' + mlite.token,
+        type: 'POST',
+        data: { kode_brng: kode },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) { location.reload(); }
+            else { alert('Gagal hapus: ' + res.message); }
+        }
+    });
+});
+
+// Search tabel
+$(document).ready(function() {
+    if ($.fn.DataTable) {
+        $('#tbl-vaksin').DataTable({
+            language: { search: '', searchPlaceholder: 'Cari...' },
+            pageLength: 25,
+            order: [[1, 'asc']],
+        });
+    }
+});
+</script>
