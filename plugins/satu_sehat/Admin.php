@@ -2044,7 +2044,7 @@ public function postDeleteStudy()
                 "end": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"
             },
             "location": [{"location": {"reference": "Location/' . $id_lokasi_satusehat . '","display": "' . $kd_poli . ' ' . $nm_poli . '"}}],
-            "diagnosis": [{"condition": {"reference": "urn:uuid:' . $uuid_condition . '","display": "' . ($diagnosa_pasien['nm_penyakit'] ?? '') . '"},"use": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role","code": "DD","display": "Discharge diagnosis"}]},"rank": 1}],
+            ' . (!empty($diagnosa_pasien['kd_penyakit']) ? '"diagnosis": [{"condition": {"reference": "urn:uuid:' . $uuid_condition . '","display": "' . ($diagnosa_pasien['nm_penyakit'] ?? '') . '"},"use": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role","code": "DD","display": "Discharge diagnosis"}]},"rank": 1}],' : '') . '
             "statusHistory": [
                 {"status": "arrived","period": {"start": "' . $this->convertTimeSatset($tgl_registrasi . ' ' . $jam_reg) . $zonawaktu . '","end": "' . $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu . '"}},
                 {"status": "in-progress","period": {"start": "' . $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu . '","end": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"}},
@@ -5813,192 +5813,265 @@ public function postDeleteStudy()
     redirect(url([ADMIN, 'satu_sehat', 'mappingobat']));
   }
 
-  public function getBunban($periode = '')
+  // ================================================================
+  // postStartBunban
+  // Daftarkan semua pasien Ralan+Ranap ke satu_sehat_job_queue
+  // POST /satu_sehat/startbunban
+  // ================================================================
+  public function postStartBunban()
   {
-    $this->_addHeaderFiles();
-    if ($periode == '') {
-      $periode = date('Y-m-d');
-    }
-    if (isset($periode) && $periode != '') {
-      $periode = $periode;
-    }
-    $data_response = [];
-    $url = url([ADMIN, 'satu_sehat', 'bunban', $periode]);
-    $mainMenu = url([ADMIN, 'satu_sehat', 'manage']);
-    echo 'Tanggal Yang Dipilih : ' . $periode;
-    echo '<br>
-            <label for="tanggal">Pilih Tanggal:</label>
-            <input type="date" id="tanggal" name="tanggal" required>
-            <button type="button" onclick="redirectToDate()">Tampilkan</button>
-      
-
-          <script>
-            function redirectToDate() {
-            let currentLocation = window.location;
-            console.log(currentLocation.origin + currentLocation.pathname);
-            const params = new URLSearchParams(window.location.search);
-             const t = params.get("t");
-             console.log(t);
-            var baseURL = currentLocation.origin + currentLocation.pathname;
-              const dateValue = document.getElementById("tanggal").value;
-              if (dateValue) {
-                console.log("Redirecting to: " + baseURL + "/satu_sehat/bunban/" + dateValue + "?t=" + t);
-                window.location.href = baseURL + "/" + dateValue + "?t=" + t;
+      header('Content-Type: application/json');
+  
+      $periode    = $_POST['periode']    ?? date('Y-m-d');
+      $batch_size = $_POST['batch_size'] ?? '10'; // 'all' atau angka
+  
+      // FIX: hapus job_queue periode ini dulu — fresh run tiap klik Start
+      $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
+  
+      // Ambil pasien — limit sesuai batch_size
+      $query = $this->db('reg_periksa')
+          ->where('tgl_registrasi', $periode)
+          ->where('stts', '!=', 'Batal')
+          ->where('kd_poli', '!=', 'IGD01');
+  
+      if ($batch_size !== 'all') {
+          $query = $query->limit((int)$batch_size);
+      }
+  
+      $pasien_list = $query->toArray();
+  
+      $registered = 0;
+      foreach ($pasien_list as $row) {
+          if (!in_array($row['status_lanjut'], ['Ralan', 'Ranap'])) continue;
+  
+          $nm_pasien = $this->core->getPasienInfo('nm_pasien', $row['no_rkm_medis']);
+  
+          // Cek apakah sudah terkirim sebelumnya di mlite_satu_sehat_response
+          $ss     = $this->db('mlite_satu_sehat_response')->where('no_rawat', $row['no_rawat'])->oneArray();
+          $status = (!empty($ss['id_encounter'])) ? 'skip' : 'pending';
+  
+          $this->db('satu_sehat_job_queue')->save([
+              'periode'   => $periode,
+              'no_rawat'  => $row['no_rawat'],
+              'nm_pasien' => $nm_pasien,
+              'status'    => $status,
+          ]);
+          $registered++;
+      }
+  
+      // Ambil summary dari job_queue yang baru
+      $all     = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
+      $total   = count($all);
+      $pending = count(array_filter($all, fn($r) => $r['status'] === 'pending'));
+      $skip    = count(array_filter($all, fn($r) => $r['status'] === 'skip'));
+  
+      echo json_encode([
+          'success'    => true,
+          'periode'    => $periode,
+          'total'      => $total,
+          'pending'    => $pending,
+          'done'       => $skip, // skip dianggap done
+          'sukses'     => 0,
+          'skip'       => $skip,
+          'error'      => 0,
+          'registered' => $registered,
+          'all'        => array_map(fn($r) => [
+              'no_rawat'    => $r['no_rawat'],
+              'nm_pasien'   => $r['nm_pasien'],
+              'status'      => $r['status'],
+              'detail_json' => $r['detail_json'] ? json_decode($r['detail_json'], true) : [],
+              'error_msg'   => $r['error_msg'],
+          ], $all),
+      ]);
+      exit();
+  }
+  
+  // ================================================================
+  // getProcessBunban
+  // Proses 1 pasien — return detail per resource
+  // GET /satu_sehat/processbunban/{no_rawat_converted}
+  // ================================================================
+  public function getProcessBunban($no_rawat_converted = '')
+  {
+      ob_start();
+      header('Content-Type: application/json');
+  
+      if (!$no_rawat_converted) {
+          ob_end_clean();
+          echo json_encode(['success' => false, 'message' => 'no_rawat tidak ada']);
+          exit();
+      }
+  
+      $no_rawat     = revertNoRawat($no_rawat_converted);
+      $no_rkm_medis = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
+      $nm_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
+  
+      // Set status processing
+      $this->db('satu_sehat_job_queue')
+          ->where('no_rawat', $no_rawat)
+          ->save(['status' => 'processing']);
+  
+      // Cek apakah sudah ada di Satu Sehat
+      $ss_response = $this->db('mlite_satu_sehat_response')->where('no_rawat', $no_rawat)->oneArray();
+      if (!empty($ss_response['id_encounter'])) {
+          $detail = [['label' => 'Encounter', 'id' => $ss_response['id_encounter'], 'sent' => true, 'skip' => true]];
+          $this->db('satu_sehat_job_queue')
+              ->where('no_rawat', $no_rawat)
+              ->save(['status' => 'skip', 'detail_json' => json_encode($detail)]);
+          ob_end_clean();
+          echo json_encode([
+              'success'   => true,
+              'status'    => 'skip',
+              'no_rawat'  => $no_rawat,
+              'nm_pasien' => $nm_pasien,
+              'message'   => 'Sudah ada di Satu Sehat — dilewati',
+              'resources' => $detail,
+          ]);
+          exit();
+      }
+  
+      // Proses kirim bundle
+      try {
+          $result_raw = $this->getEncounterBundle(convertNorawat($no_rawat), 'all');
+          $result_arr = json_decode(json_encode($result_raw), true);
+  
+          $id_encounter = '';
+          $resources    = [];
+  
+          // Parse entry per resource
+          if (!empty($result_arr['entry'])) {
+              foreach ($result_arr['entry'] as $entry) {
+                  $resource_type = $entry['response']['resourceType'] ?? null;
+                  $resource_id   = $entry['response']['resourceID']   ?? '';
+                  $status_code   = $entry['response']['status']        ?? '';
+                  if (!$resource_type) continue;
+                  $sent = strpos($status_code, '201') !== false || strpos($status_code, '200') !== false;
+                  if ($resource_type === 'Encounter' && $sent) $id_encounter = $resource_id;
+                  $resources[] = [
+                      'label' => $resource_type,
+                      'id'    => $resource_id,
+                      'sent'  => $sent,
+                      'skip'  => false,
+                      'error' => $sent ? '' : ($entry['response']['outcome']['issue'][0]['details']['text'] ?? 'Gagal'),
+                  ];
               }
-              return false;
-            }
-          </script>';
-    echo '<br>';
-    $cekbundle = $this->db('mlite_satu_sehat_log')->where('tgl_registrasi', $periode)->where('response', 'Belum')->limit(5)->toArray();
-    if (!$cekbundle) {
-      $limit = 5;
-      $offset = 0;
-      if (isset($_GET['offset']) && $_GET['offset'] != '') {
-        $offset = $_GET['offset'];
-      }
-      $result = $this->db('reg_periksa')
-        ->select('no_rawat')
-        ->where('reg_periksa.tgl_registrasi', $periode)
-        ->where('stts', '!=', 'Batal')
-        ->where('kd_poli', '!=', 'IGD01')
-        ->where('status_lanjut', 'Ralan')
-        ->limit($limit)
-        ->offset($offset)
-        ->toArray();
-      $no = 1;
-      foreach ($result as $row) {
-        $no_rawat = $row['no_rawat'];
-        $cek_data = $this->db('mlite_satu_sehat_log')->where('no_rawat', $no_rawat)->oneArray();
-        if (!$cek_data) {
-          $this->db('mlite_satu_sehat_log')->save([
-            'no_rawat' => $no_rawat,
-            'tgl_registrasi' => $periode,
-            'response' => 'Belum'
+          }
+  
+          // Cek error bundle
+          if (!empty($result_arr['issue'])) {
+              $error_msg = $result_arr['issue'][0]['details']['text'] ?? 'Unknown error';
+              $detail    = [['label' => 'Bundle', 'sent' => false, 'error' => $error_msg]];
+              $this->db('satu_sehat_job_queue')
+                  ->where('no_rawat', $no_rawat)
+                  ->save(['status' => 'error', 'error_msg' => $error_msg, 'detail_json' => json_encode($detail)]);
+              ob_end_clean();
+              echo json_encode([
+                  'success'   => false,
+                  'status'    => 'error',
+                  'no_rawat'  => $no_rawat,
+                  'nm_pasien' => $nm_pasien,
+                  'message'   => $error_msg,
+                  'resources' => $detail,
+              ]);
+              exit();
+          }
+  
+          $final_status = $id_encounter ? 'done' : 'error';
+          $this->db('satu_sehat_job_queue')
+              ->where('no_rawat', $no_rawat)
+              ->save([
+                  'status'      => $final_status,
+                  'detail_json' => json_encode($resources),
+                  'error_msg'   => $id_encounter ? null : 'Encounter gagal terkirim',
+              ]);
+  
+          ob_end_clean();
+          echo json_encode([
+              'success'   => $id_encounter ? true : false,
+              'status'    => $final_status,
+              'no_rawat'  => $no_rawat,
+              'nm_pasien' => $nm_pasien,
+              'message'   => $id_encounter ? 'Sukses!' : 'Encounter gagal terkirim',
+              'resources' => $resources,
           ]);
-          echo $no_rawat . "<br>";
-          echo "Menyimpan data <br>";
-          echo '==========================================<br>';
-        } else {
-          echo $no . "Sudah Ada<br>";
-          echo '==========================================<br>';
-        }
-        $no++;
-      }
-      $offset += $limit;
-      echo '<script type="text/javascript">
-          document.addEventListener("DOMContentLoaded", function(event) { 
-          let currentLocation = window.location;
-          const params = new URLSearchParams(window.location.search);
-          const t = params.get("t");
-          let offset = null;
-          let nextoffset = 5;
-          if (!params.has("offset")) {
-            nextoffset = offset + 5;
-          } else {
-            nextoffset = nextoffset + Number(params.get("offset"));
-          }
-          var baseURL = currentLocation.origin + currentLocation.pathname;
-          const dateValue = document.getElementById("tanggal").value;
-            var auto_refresh = setInterval(
-              function ()
-              {
-                console.log(baseURL + "?offset="+ nextoffset +"&t=" + t);
-                window.location.href = baseURL + "?offset="+ nextoffset +"&t=" + t;
-              }, 30000); // refresh every 10000 milliseconds
-          });
-          </script>';
-    } else {
-      foreach ($cekbundle as $row) {
-        $no_rawat = $row['no_rawat'];
-        $mlite_satu_sehat_response = $this->db('mlite_satu_sehat_response')->where('no_rawat', $no_rawat)->oneArray();
-        $row['response'] = null;
-        if ($mlite_satu_sehat_response['id_encounter'] != '') {
-          $row['response'] = $mlite_satu_sehat_response['id_encounter'];
-          $this->db('mlite_satu_sehat_log')->where('no_rawat', $no_rawat)->update([
-            'response' => $mlite_satu_sehat_response['id_encounter']
+          exit();
+  
+      } catch (\Exception $e) {
+          $detail = [['label' => 'Exception', 'sent' => false, 'error' => $e->getMessage()]];
+          $this->db('satu_sehat_job_queue')
+              ->where('no_rawat', $no_rawat)
+              ->save(['status' => 'error', 'error_msg' => $e->getMessage(), 'detail_json' => json_encode($detail)]);
+          ob_end_clean();
+          echo json_encode([
+              'success'   => false,
+              'status'    => 'error',
+              'no_rawat'  => $no_rawat,
+              'nm_pasien' => $nm_pasien,
+              'message'   => $e->getMessage(),
+              'resources' => $detail,
           ]);
-        } else {
-          $row['response'] = $this->getEncounterBundle(convertNorawat($no_rawat), 'all');
-          $response = json_decode(json_encode($row['response']), true);
-          if ($response['issue'][0]['severity'] == 'error') {
-            $this->db('mlite_satu_sehat_log')->where('no_rawat', $no_rawat)->update([
-              'response' => $response['issue'][0]['details']['text']
-            ]);
-          }
-          ;
-          if ($response['entry'][0]['response']['status'] == '201 Created') {
-            $this->db('mlite_satu_sehat_log')->where('no_rawat', $no_rawat)->update([
-              'response' => $response['entry'][0]['response']['resourceID']
-            ]);
-          }
-        }
-        $row['id_encounter'] = isset_or($mlite_satu_sehat_response['id_encounter'], '');
-        $row['id_condition'] = isset_or($mlite_satu_sehat_response['id_condition'], '');
-        $row['id_observation_ttvtensi'] = isset_or($mlite_satu_sehat_response['id_observation_ttvtensi'], '');
-        $row['id_observation_ttvnadi'] = isset_or($mlite_satu_sehat_response['id_observation_ttvnadi'], '');
-        $row['id_observation_ttvrespirasi'] = isset_or($mlite_satu_sehat_response['id_observation_ttvrespirasi'], '');
-        $row['id_observation_ttvsuhu'] = isset_or($mlite_satu_sehat_response['id_observation_ttvsuhu'], '');
-        $row['id_observation_ttvspo2'] = isset_or($mlite_satu_sehat_response['id_observation_ttvspo2'], '');
-        $row['id_observation_ttvgcs'] = isset_or($mlite_satu_sehat_response['id_observation_ttvgcs'], '');
-        $row['id_observation_ttvtinggi'] = isset_or($mlite_satu_sehat_response['id_observation_ttvtinggi'], '');
-        $row['id_observation_ttvberat'] = isset_or($mlite_satu_sehat_response['id_observation_ttvberat'], '');
-        $row['id_observation_ttvperut'] = isset_or($mlite_satu_sehat_response['id_observation_ttvperut'], '');
-        $row['id_observation_ttvkesadaran'] = isset_or($mlite_satu_sehat_response['id_observation_ttvkesadaran'], '');
-        $row['id_procedure'] = isset_or($mlite_satu_sehat_response['id_procedure'], '');
-        $row['id_composition'] = isset_or($mlite_satu_sehat_response['id_composition'], '');
-        $data_response[] = $row;
+          exit();
       }
-      $json = json_encode($data_response);
-      $return = json_decode($json, true);
-      foreach ($return as $value) {
-        echo '<br>';
-        echo 'Encounter : ' . $value['id_encounter'] . '<br>';
-        echo 'Condition : ' . $value['id_condition'] . '<br>';
-        echo 'Procedure : ' . $value['id_procedure'] . '<br>';
-        echo 'Nadi : ' . $value['id_observation_ttvnadi'] . '<br>';
-        echo 'Respirasi : ' . $value['id_observation_ttvrespirasi'] . '<br>';
-        echo 'Suhu : ' . $value['id_observation_ttvsuhu'] . '<br>';
-        // echo 'Poli : '.$this->core->getPoliklinikInfo('nm_poli',$value['kd_poli']);
-        echo '<br>';
-        echo 'Nama Pasien : ' . $this->core->getPasienInfo('nm_pasien', $this->core->getRegPeriksaInfo('no_rkm_medis', $value['no_rawat']));
-        echo '<br>';
-        echo 'No Rawat : ' . $value['no_rawat'];
-        echo '<br>';
-        echo (json_encode($value['response']) == null) ? '' : json_encode($value['response']);
-        echo '<br>';
-        echo '==========================================';
+  }
+  
+  // ================================================================
+  // getStatusBunban
+  // Return summary progress per periode
+  // GET /satu_sehat/statusbunban/{periode}
+  // ================================================================
+  public function getStatusBunban($periode = '')
+  {
+      header('Content-Type: application/json');
+      if (!$periode) $periode = date('Y-m-d');
+  
+      $all    = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
+      $total  = count($all);
+      $done   = 0; $sukses = 0; $skip = 0; $error = 0; $pending = 0;
+      $pasien = [];
+  
+      foreach ($all as $row) {
+          if ($row['status'] === 'done')       { $done++; $sukses++; }
+          elseif ($row['status'] === 'skip')   { $done++; $skip++; }
+          elseif ($row['status'] === 'error')  { $done++; $error++; }
+          elseif ($row['status'] === 'processing') { $done++; }
+          else $pending++;
+  
+          $pasien[] = [
+              'no_rawat'    => $row['no_rawat'],
+              'nm_pasien'   => $row['nm_pasien'],
+              'status'      => $row['status'],
+              'error_msg'   => $row['error_msg'],
+              'detail_json' => $row['detail_json'] ? json_decode($row['detail_json'], true) : [],
+          ];
       }
-      echo '<br>';
-      echo '<br>';
-      echo '<script type="text/javascript">
-      document.addEventListener("DOMContentLoaded", function(event) { 
-        let currentLocation = window.location;
-          const params = new URLSearchParams(window.location.search);
-          var baseURL = currentLocation.origin + currentLocation.pathname;
-          const dateValue = document.getElementById("tanggal").value;
-          const t = params.get("t");
-          let offset = null;
-          let nextoffset = 5;
-          let url = null
-          if (!params.has("offset")) {
-            nextoffset = offset + 5;
-            url = baseURL + "?offset="+ nextoffset +"&t=" + t;
-          } else {
-            nextoffset = params.get("offset");
-            url = baseURL + "?offset="+ nextoffset +"&t=" + t;
-          }
-          
-        var auto_refresh = setInterval(
-          function ()
-          {
-            console.log(url);
-            window.location.href = url;
-          }, 25000); // refresh every 10000 milliseconds
-      });
-      </script>';
-    }
-    echo '<a href="' . $mainMenu . '" class="btn btn-primary"> Menu Utama</a>';
-    exit();
+  
+      echo json_encode([
+          'success' => true,
+          'periode' => $periode,
+          'total'   => $total,
+          'done'    => $done,
+          'pending' => $pending,
+          'sukses'  => $sukses,
+          'skip'    => $skip,
+          'error'   => $error,
+          'pct'     => $total > 0 ? round(($done / $total) * 100) : 0,
+          'pasien'  => $pasien,
+      ]);
+      exit();
+  }
+  
+  // ================================================================
+  // postResetBunban
+  // Reset job queue untuk periode tertentu (hapus & daftar ulang)
+  // POST /satu_sehat/resetbunban
+  // ================================================================
+  public function postResetBunban()
+  {
+      header('Content-Type: application/json');
+      $periode = $_POST['periode'] ?? date('Y-m-d');
+      $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
+      echo json_encode(['success' => true, 'message' => 'Job queue direset untuk ' . $periode]);
+      exit();
   }
 
   public function getResponse()
