@@ -1,492 +1,470 @@
 <style>
-/* ── Modal override ── */
-#bunbanModal .modal-dialog { width: 700px; max-width: 96%; }
+#bunbanModal .modal-dialog { width:720px; max-width:96%; }
 
-/* ── Progress bar L1 ── */
-.bb-pbar-wrap { background:#e2e8f0; border-radius:10px; height:10px; overflow:hidden; margin:8px 0 4px; }
-.bb-pbar { height:10px; border-radius:10px; background:#2563eb; transition:width .4s ease; width:0%; }
-.bb-pbar.sukses { background:#10b981; }
-.bb-pbar.error  { background:#ef4444; }
+.bb-pbar-outer { background:#e2e8f0; border-radius:8px; height:10px; overflow:hidden; margin:8px 0 4px; }
+.bb-pbar       { height:10px; border-radius:8px; background:#2563eb; transition:width .4s; width:0%; }
+.bb-pbar.done  { background:#10b981; }
 
-/* ── Summary badges ── */
-.bb-summary { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; margin-top:6px; }
-.bb-sum { display:flex; align-items:center; gap:4px; }
-.bb-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.bb-summary { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; margin-top:6px; }
+.bb-sum     { display:flex; align-items:center; gap:4px; }
+.bb-dot     { width:9px; height:9px; border-radius:50%; }
 
-/* ── Pasien list ── */
-.bb-list { max-height:360px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-top:12px; }
-.bb-item { border-bottom:1px solid #f1f5f9; }
+.bb-list     { max-height:320px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; margin-top:10px; }
+.bb-item     { border-bottom:1px solid #f1f5f9; }
 .bb-item:last-child { border-bottom:none; }
-
-/* ── Pasien header ── */
-.bb-hdr {
-    display:flex; align-items:center; gap:8px;
-    padding:7px 12px; cursor:pointer; user-select:none;
-    transition:background .15s;
-}
+.bb-hdr      { display:flex; align-items:center; gap:8px; padding:7px 12px; cursor:pointer; transition:background .15s; }
 .bb-hdr:hover { background:#f8fafc; }
+.bb-ic       { width:18px; text-align:center; font-size:13px; flex-shrink:0; }
+.bb-nm       { flex:1; font-size:12px; font-weight:500; color:#1e293b; }
+.bb-nr       { font-size:10px; font-family:monospace; color:#94a3b8; margin-right:4px; }
+.bb-bdg      { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; white-space:nowrap; }
 
-/* ── Status icon ── */
-.bb-ic { width:18px; text-align:center; font-size:13px; flex-shrink:0; }
-.wait  { color:#d1d5db; }
-.run   { color:#2563eb; }
-.done  { color:#10b981; }
-.skip  { color:#94a3b8; }
-.error { color:#ef4444; }
+.bb-detail   { display:none; padding:6px 12px 8px 38px; background:#f8fafc; border-top:1px solid #e2e8f0; }
+.bb-res      { display:flex; align-items:center; gap:6px; font-size:11px; padding:2px 0; }
+.bb-rl       { color:#475569; min-width:130px; }
+.bb-rid      { font-family:monospace; font-size:10px; color:#2563eb; word-break:break-all; }
+.bb-rerr     { font-size:10px; color:#ef4444; }
 
-.bb-nm { flex:1; font-size:12px; font-weight:500; color:#1e293b; }
-.bb-nr { font-size:10px; font-family:monospace; color:#94a3b8; margin-right:6px; }
+/* Search table */
+.bb-search-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.bb-search-tbl th { background:#f8fafc; padding:6px 10px; text-align:left; border-bottom:2px solid #e2e8f0; font-weight:600; color:#374151; }
+.bb-search-tbl td { padding:6px 10px; border-bottom:1px solid #f1f5f9; color:#475569; }
+.bb-search-tbl tr:hover td { background:#f8fafc; }
+.bb-search-tbl .badge-done    { background:#dcfce7;color:#166534;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600; }
+.bb-search-tbl .badge-pending { background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600; }
 
-.bb-bdg { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; white-space:nowrap; }
-.bdg-done  { background:#dcfce7; color:#166534; }
-.bdg-skip  { background:#f1f5f9; color:#64748b; }
-.bdg-error { background:#fee2e2; color:#991b1b; }
-.bdg-run   { background:#dbeafe; color:#1e40af; }
-.bdg-wait  { background:#f8fafc; color:#94a3b8; }
-
-/* ── Detail L2 ── */
-.bb-detail { display:none; padding:6px 12px 8px 38px; background:#f8fafc; border-top:1px solid #e2e8f0; }
-.bb-res { display:flex; align-items:center; gap:6px; font-size:11px; padding:2px 0; }
-.bb-ri  { width:14px; text-align:center; flex-shrink:0; }
-.bb-rl  { color:#475569; min-width:130px; }
-.bb-rid { font-family:monospace; font-size:10px; color:#2563eb; word-break:break-all; }
-.bb-rerr { font-size:10px; color:#ef4444; }
-.bb-rsk  { font-size:10px; color:#94a3b8; }
-
-/* ── Settings panel ── */
-.bb-settings { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px 14px; margin-bottom:12px; }
-.bb-settings label { font-size:12px; font-weight:600; color:#374151; margin-bottom:2px; display:block; }
-.bb-settings select, .bb-settings input[type=date] { font-size:12px; border:1px solid #d1d5db; border-radius:4px; padding:4px 8px; }
+/* Batch opts */
+.bb-batch-opts { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.bb-batch-opt  { padding:4px 12px; border-radius:6px; border:1px solid #d1d5db; font-size:12px; cursor:pointer; background:#fff; color:#374151; transition:all .15s; }
+.bb-batch-opt:hover  { border-color:#2563eb; color:#2563eb; }
+.bb-batch-opt.active { background:#2563eb; color:#fff; border-color:#2563eb; font-weight:600; }
 </style>
 
-<!-- Modal Kirim Massal -->
 <div class="modal fade" id="bunbanModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content" style="border-radius:8px;overflow:hidden;">
+
             <div class="modal-header" style="background:#0f172a;border:none;padding:11px 16px;">
-                <button type="button" class="close" id="btn-close-bunban" data-dismiss="modal" style="color:#94a3b8;opacity:1;display:none;">&times;</button>
                 <h4 class="modal-title" style="font-size:13px;color:#e2e8f0;margin:0;">
                     <i class="fa fa-send" style="color:#10b981;margin-right:6px;"></i>
                     Kirim Massal Satu Sehat
                     <span id="bb-periode-lbl" style="color:#64748b;font-size:11px;margin-left:6px;"></span>
                 </h4>
             </div>
+
             <div class="modal-body" style="padding:16px 18px;">
 
-                <!-- Settings -->
-                <div class="bb-settings" id="bb-settings-panel">
+                <!-- Settings Panel -->
+                <div id="bb-settings" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:14px;">
                     <div class="row">
                         <div class="col-sm-4">
-                            <label>Tanggal</label>
-                            <input type="date" id="bb-tgl" style="width:100%;">
+                            <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Tanggal</div>
+                            <input type="date" id="bb-tgl" class="form-control input-sm">
                         </div>
-                        <div class="col-sm-4">
-                            <label>Jumlah per Batch</label>
-                            <select id="bb-batch" style="width:100%;">
-                                <option value="1">1 pasien</option>
-                                <option value="3">3 pasien</option>
-                                <option value="10" selected>10 pasien</option>
-                                <option value="25">25 pasien</option>
-                                <option value="50">50 pasien</option>
-                                <option value="all">All (semua pasien)</option>
-                            </select>
+                        <div class="col-sm-8">
+                            <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">
+                                Cari Pasien <span style="font-weight:400;color:#94a3b8;">(opsional — kosongkan untuk ambil otomatis)</span>
+                            </div>
+                            <div style="display:flex;gap:6px;">
+                                <input type="text" id="bb-cari-nama" class="form-control input-sm" placeholder="Ketik nama pasien...">
+                                <button class="btn btn-default btn-sm" id="btn-cari-pasien" style="white-space:nowrap;">
+                                    <i class="fa fa-search"></i> Cari
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div style="margin-top:10px;font-size:11px;color:#64748b;" id="bb-estimasi"></div>
-                    <div style="margin-top:8px;display:flex;gap:6px;">
+
+                    <!-- Hasil pencarian -->
+                    <div id="bb-search-result" style="display:none;margin-top:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:12px;color:#374151;font-weight:600;">Hasil Pencarian</span>
+                            <div style="display:flex;gap:6px;">
+                                <button class="btn btn-xs btn-default" id="btn-check-all">Pilih Semua</button>
+                                <button class="btn btn-xs btn-default" id="btn-uncheck-all">Batal Semua</button>
+                            </div>
+                        </div>
+                        <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+                            <table class="bb-search-tbl">
+                                <thead>
+                                    <tr>
+                                        <th style="width:32px;"></th>
+                                        <th>No. Rawat</th>
+                                        <th>No. RM</th>
+                                        <th>Nama Pasien</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bb-search-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div id="bb-search-info" style="font-size:11px;color:#64748b;margin-top:4px;"></div>
+                    </div>
+
+                    <!-- Jumlah (hanya tampil kalau tidak ada pencarian) -->
+                    <div id="bb-batch-wrap" style="margin-top:10px;">
+                        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">
+                            Jumlah Pasien <span style="font-weight:400;color:#94a3b8;">(jika tidak memilih dari pencarian)</span>
+                        </div>
+                        <div class="bb-batch-opts">
+                            <span class="bb-batch-opt" data-val="1">1</span>
+                            <span class="bb-batch-opt" data-val="3">3</span>
+                            <span class="bb-batch-opt active" data-val="10">10</span>
+                            <span class="bb-batch-opt" data-val="25">25</span>
+                            <span class="bb-batch-opt" data-val="50">50</span>
+                            <span class="bb-batch-opt" data-val="all">Semua</span>
+                        </div>
+                        <input type="hidden" id="bb-batch" value="10">
+                    </div>
+
+                    <div id="bb-estimasi" style="font-size:11px;color:#64748b;margin-top:8px;"></div>
+                    <div style="margin-top:10px;display:flex;gap:6px;">
                         <button class="btn btn-primary btn-sm" id="btn-start-bunban">
                             <i class="fa fa-play"></i> Mulai Kirim
                         </button>
-                        <button class="btn btn-danger btn-sm" id="btn-stop-all" style="display:none;">
-                            <i class="fa fa-stop"></i> Stop
-                        </button>
                         <button class="btn btn-default btn-sm" id="btn-reset-bunban" style="display:none;">
-                            <i class="fa fa-refresh"></i> Reset & Mulai Ulang
+                            <i class="fa fa-refresh"></i> Reset & Ulang
                         </button>
                     </div>
                 </div>
 
-                <!-- Progress L1 -->
-                <div id="bb-progress-panel" style="display:none;">
+                <!-- Progress Panel -->
+                <div id="bb-progress" style="display:none;">
                     <div style="display:flex;justify-content:space-between;font-size:12px;color:#475569;">
                         <span id="bb-status-txt">Mempersiapkan...</span>
-                        <span><strong id="bb-done-n">0</strong>/<strong id="bb-total-n">0</strong> &nbsp; <strong id="bb-pct-txt">0%</strong></span>
+                        <span><strong id="bb-done-n">0</strong>/<strong id="bb-total-n">0</strong> &nbsp;<strong id="bb-pct-txt">0%</strong></span>
                     </div>
-                    <div class="bb-pbar-wrap"><div class="bb-pbar" id="bb-pbar"></div></div>
+                    <div class="bb-pbar-outer"><div class="bb-pbar" id="bb-pbar"></div></div>
                     <div class="bb-summary">
-                        <div class="bb-sum"><div class="bb-dot" style="background:#10b981;"></div>Sukses: <strong id="bb-n-sukses">0</strong></div>
-                        <div class="bb-sum"><div class="bb-dot" style="background:#94a3b8;"></div>Skip: <strong id="bb-n-skip">0</strong></div>
-                        <div class="bb-sum"><div class="bb-dot" style="background:#ef4444;"></div>Error: <strong id="bb-n-error">0</strong></div>
-                        <div class="bb-sum"><div class="bb-dot" style="background:#d1d5db;"></div>Pending: <strong id="bb-n-pending">0</strong></div>
+                        <div class="bb-sum"><div class="bb-dot" style="background:#10b981;"></div>Sukses: <strong id="bb-n-s">0</strong></div>
+                        <div class="bb-sum"><div class="bb-dot" style="background:#94a3b8;"></div>Skip: <strong id="bb-n-sk">0</strong></div>
+                        <div class="bb-sum"><div class="bb-dot" style="background:#ef4444;"></div>Error: <strong id="bb-n-e">0</strong></div>
+                        <div class="bb-sum"><div class="bb-dot" style="background:#d1d5db;"></div>Pending: <strong id="bb-n-p">0</strong></div>
                     </div>
-
-                    <!-- Batch control -->
-                    <div id="bb-batch-ctrl" style="margin-top:10px;display:none;background:#eff6ff;border-radius:5px;padding:8px 12px;font-size:12px;color:#1e40af;">
-                        <i class="fa fa-pause-circle"></i>
-                        Batch selesai. Klik <strong>Lanjut</strong> untuk batch berikutnya atau <strong>Stop</strong> untuk berhenti.
-                        <div style="margin-top:6px;display:flex;gap:6px;">
-                            <button class="btn btn-primary btn-xs" id="btn-next-batch"><i class="fa fa-forward"></i> Lanjut Batch</button>
-                            <button class="btn btn-danger btn-xs" id="btn-stop-bunban"><i class="fa fa-stop"></i> Stop</button>
-                        </div>
-                    </div>
-
-                    <!-- Pasien list -->
-                    <div class="bb-list" id="bb-list" style="margin-top:10px;"></div>
+                    <div class="bb-list" id="bb-list"></div>
                 </div>
 
             </div>
+
             <div class="modal-footer" style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:8px 16px;display:flex;align-items:center;">
-                <span id="bb-footer" style="font-size:11px;color:#64748b;flex:1;text-align:left;"></span>
-                <button class="btn btn-danger btn-sm" id="btn-stop-bunban2" style="display:none;margin-right:4px;">
+                <span id="bb-footer" style="font-size:11px;color:#64748b;flex:1;"></span>
+                <button class="btn btn-danger btn-sm" id="btn-stop-bunban" style="display:none;margin-right:4px;">
                     <i class="fa fa-stop"></i> Stop
                 </button>
-                <button class="btn btn-default btn-sm" id="btn-close-bunban2" data-dismiss="modal">Tutup</button>
+                <button class="btn btn-default btn-sm" data-dismiss="modal">Tutup</button>
             </div>
+
         </div>
     </div>
 </div>
 
 <script type="text/javascript">
-(function() {
+(function(){
 var baseURL   = mlite.url + '/' + mlite.admin;
-var bbQueue   = [];   // antrian batch saat ini
-var bbAll     = [];   // semua pasien
-var bbTotal   = 0;
-var bbStopped = false;
-var bbPeriode = '';
-var bbBatch   = 10;
-var bbOffset  = 0;
+var bbQueue   = [], bbTotal = 0, bbStopped = false, bbPeriode = '', bbBatch = '10';
+var bbSelected = []; // pasien yang dipilih dari pencarian
 
-// ── Icon helpers ──
-function ic(status) {
+function icStatus(s) {
     var map = {
-        wait: '<i class="fa fa-circle-o bb-ic wait"></i>',
-        run:  '<i class="fa fa-circle-o-notch fa-spin bb-ic run"></i>',
-        done: '<i class="fa fa-check-circle bb-ic done"></i>',
-        skip: '<i class="fa fa-forward bb-ic skip"></i>',
-        error:'<i class="fa fa-times-circle bb-ic error"></i>',
+        done:  '<i class="fa fa-check-circle bb-ic" style="color:#10b981;"></i>',
+        skip:  '<i class="fa fa-forward bb-ic" style="color:#94a3b8;"></i>',
+        error: '<i class="fa fa-times-circle bb-ic" style="color:#ef4444;"></i>',
+        run:   '<i class="fa fa-circle-o-notch fa-spin bb-ic" style="color:#2563eb;"></i>',
     };
-    return map[status] || map.wait;
-}
-function ric(sent, skip, error) {
-    if (skip)  return '<i class="fa fa-minus bb-ri" style="color:#94a3b8;"></i>';
-    if (sent)  return '<i class="fa fa-check bb-ri" style="color:#10b981;"></i>';
-    if (error) return '<i class="fa fa-times bb-ri" style="color:#ef4444;"></i>';
-    return '<i class="fa fa-circle-o bb-ri" style="color:#d1d5db;"></i>';
-}
-function bdg(status) {
-    var map = {
-        done: '<span class="bb-bdg bdg-done">Sukses</span>',
-        skip: '<span class="bb-bdg bdg-skip">Skip/Ada</span>',
-        error:'<span class="bb-bdg bdg-error">Error</span>',
-        run:  '<span class="bb-bdg bdg-run">Proses...</span>',
-        wait: '<span class="bb-bdg bdg-wait">Menunggu</span>',
-    };
-    return map[status] || map.wait;
+    return map[s] || '<i class="fa fa-circle-o bb-ic" style="color:#d1d5db;"></i>';
 }
 
-// ── Render resource detail (L2) ──
+function badge(s) {
+    var map = {
+        done:  'background:#dcfce7;color:#166534',
+        skip:  'background:#f1f5f9;color:#64748b',
+        error: 'background:#fee2e2;color:#991b1b',
+        run:   'background:#dbeafe;color:#1e40af',
+        wait:  'background:#f8fafc;color:#94a3b8',
+    };
+    var label = { done:'Sukses', skip:'Skip', error:'Error', run:'Proses...', wait:'Menunggu' };
+    return '<span class="bb-bdg" style="' + (map[s]||map.wait) + '">' + (label[s]||'Menunggu') + '</span>';
+}
+
 function renderRes(resources) {
-    if (!resources || !resources.length) return '<div class="bb-rsk">Tidak ada detail</div>';
-    var h = '';
-    resources.forEach(function(r) {
-        if (r.skip) return;
+    if (!resources || !resources.length) return '<div style="font-size:11px;color:#94a3b8;">Tidak ada detail</div>';
+    return resources.filter(function(r){ return !r.skip; }).map(function(r) {
+        var ico = r.sent
+            ? '<i class="fa fa-check" style="color:#10b981;width:14px;text-align:center;"></i>'
+            : '<i class="fa fa-times" style="color:#ef4444;width:14px;text-align:center;"></i>';
         var right = r.sent && r.id
             ? '<span class="bb-rid">' + r.id + '</span>'
-            : (r.error ? '<span class="bb-rerr">' + r.error + '</span>' : '<span class="bb-rsk">Tidak ada data</span>');
-        h += '<div class="bb-res">' + ric(r.sent, r.skip, r.error)
-           + '<span class="bb-rl">' + r.label + '</span>' + right + '</div>';
-    });
-    return h;
+            : (r.error ? '<span class="bb-rerr">' + r.error + '</span>' : '<span style="font-size:10px;color:#94a3b8;">Tidak ada data</span>');
+        return '<div class="bb-res">' + ico + '<span class="bb-rl">' + r.label + '</span>' + right + '</div>';
+    }).join('');
 }
 
-// ── Render pasien item ──
 function renderItem(p) {
     var key    = p.no_rawat.replace(/\//g,'');
     var status = p.status || 'wait';
-    var detHtml = '';
+    var detail = '';
     if (p.detail_json && p.detail_json.length) {
-        detHtml = '<div class="bb-detail" id="det-' + key + '">' + renderRes(p.detail_json) + '</div>';
+        detail = '<div class="bb-detail" id="det-' + key + '">' + renderRes(p.detail_json) + '</div>';
     } else if (status === 'run') {
-        detHtml = '<div class="bb-detail" id="det-' + key + '" style="display:block;">'
-            + '<div class="bb-res"><i class="fa fa-circle-o-notch fa-spin bb-ri" style="color:#2563eb;"></i>'
-            + '<span class="bb-rl" style="color:#1e40af;">Sedang mengirim bundle ke Satu Sehat...</span></div>'
-            + '</div>';
+        detail = '<div class="bb-detail" id="det-' + key + '" style="display:block;">'
+            + '<div class="bb-res"><i class="fa fa-circle-o-notch fa-spin" style="color:#2563eb;width:14px;text-align:center;"></i>'
+            + '<span class="bb-rl" style="color:#1e40af;">Mengirim ke Satu Sehat...</span></div></div>';
     } else if (p.error_msg) {
-        detHtml = '<div class="bb-detail" id="det-' + key + '">'
-            + '<div class="bb-res"><i class="fa fa-times bb-ri" style="color:#ef4444;"></i>'
-            + '<span class="bb-rerr">' + p.error_msg + '</span></div>'
-            + '</div>';
+        detail = '<div class="bb-detail" id="det-' + key + '">'
+            + '<div class="bb-res"><i class="fa fa-times" style="color:#ef4444;width:14px;text-align:center;"></i>'
+            + '<span class="bb-rerr">' + p.error_msg + '</span></div></div>';
     }
-
     return '<div class="bb-item" id="item-' + key + '">'
         + '<div class="bb-hdr" onclick="bbToggle(\'' + key + '\')">'
-        + ic(status)
-        + '<span class="bb-nm">' + p.nm_pasien + '</span>'
-        + '<span class="bb-nr">' + p.no_rawat + '</span>'
-        + bdg(status)
-        + '</div>'
-        + detHtml
-        + '</div>';
+        + icStatus(status) + '<span class="bb-nm">' + p.nm_pasien + '</span>'
+        + '<span class="bb-nr">' + p.no_rawat + '</span>' + badge(status)
+        + '</div>' + detail + '</div>';
 }
 
-// Expose toggle
 window.bbToggle = function(key) {
     var d = $('#det-' + key);
     d.is(':visible') ? d.slideUp(150) : d.slideDown(150);
 };
 
-// ── Update progress UI ──
-function updateUI(data) {
-    var pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+function updateUI(d) {
+    var pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0;
     $('#bb-pbar').css('width', pct + '%');
-    if (pct >= 100) $('#bb-pbar').addClass('sukses');
+    if (pct >= 100) $('#bb-pbar').addClass('done');
     $('#bb-pct-txt').text(pct + '%');
-    $('#bb-done-n').text(data.done);
-    $('#bb-total-n').text(data.total);
-    $('#bb-n-sukses').text(data.sukses || 0);
-    $('#bb-n-skip').text(data.skip || 0);
-    $('#bb-n-error').text(data.error || 0);
-    $('#bb-n-pending').text(data.pending || 0);
+    $('#bb-done-n').text(d.done); $('#bb-total-n').text(d.total);
+    $('#bb-n-s').text(d.sukses||0); $('#bb-n-sk').text(d.skip||0);
+    $('#bb-n-e').text(d.error||0);  $('#bb-n-p').text(d.pending||0);
 }
 
-// ── Update/insert item di list ──
-function upsertItem(p) {
-    var key = p.no_rawat.replace(/\//g,'');
-    var el  = $('#item-' + key);
-    var newHtml = renderItem(p);
+function upsert(p) {
+    var key  = p.no_rawat.replace(/\//g,'');
+    var el   = $('#item-' + key);
+    var html = renderItem(p);
     if (el.length) {
         var open = $('#det-' + key).is(':visible');
-        el.replaceWith(newHtml);
+        el.replaceWith(html);
         if (open) $('#det-' + key).show();
     } else {
-        $('#bb-list').append(newHtml);
-        // Scroll ke item baru
-        var newEl = $('#item-' + key);
-        if (newEl.length) {
-            $('#bb-list').animate({ scrollTop: $('#bb-list').scrollTop() + newEl.position().top - 60 }, 200);
-        }
+        $('#bb-list').append(html);
+        var ne = $('#item-' + key);
+        if (ne.length) $('#bb-list').animate({scrollTop: $('#bb-list').scrollTop() + ne.position().top - 60}, 200);
     }
 }
 
-// ── Proses 1 pasien dari antrian ──
+function finish(d) {
+    $('#bb-pbar').addClass('done').css('width','100%');
+    $('#bb-status-txt').text('Selesai! ' + (d.sukses||0) + ' sukses, ' + (d.skip||0) + ' skip, ' + (d.error||0) + ' error.');
+    $('#bb-footer').html('<i class="fa fa-check-circle" style="color:#10b981;"></i> Pengiriman selesai.');
+    $('#btn-stop-bunban').hide();
+    $('#btn-reset-bunban').show();
+}
+
 function processOne() {
-    if (bbStopped || bbQueue.length === 0) {
-        // Batch habis
-        if (!bbStopped) {
-            // Cek apakah masih ada pending di DB
-            $.ajax({
-                url: baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token,
-                success: function(res) {
-                    var d = typeof res === 'string' ? JSON.parse(res) : res;
-                    updateUI(d);
-                    if (d.pending > 0 && !bbStopped) {
-                        // Masih ada pending — tawari next batch
-                        if ($('#bb-auto').is(':checked')) {
-                            // Auto lanjut
-                            startNextBatch();
-                        } else {
-                            $('#bb-batch-ctrl').show();
-                            $('#bb-status-txt').text('Batch selesai. ' + d.pending + ' pasien masih pending.');
-                        }
-                    } else {
-                        // Semua selesai
-                        finishAll(d);
-                    }
-                }
-            });
-        } else {
-            $('#bb-status-txt').text('Dihentikan.');
-            $('#btn-stop-bunban').hide(); $('#btn-stop-bunban2').hide();
-            $('#btn-close-bunban').show(); $('#btn-close-bunban2').show();
-        }
+    if (bbStopped || !bbQueue.length) {
+        $.get(baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token, function(res) {
+            var d = typeof res === 'string' ? JSON.parse(res) : res;
+            updateUI(d);
+            finish(d);
+        });
         return;
     }
 
-    var p = bbQueue.shift();
-    upsertItem({ no_rawat: p.no_rawat, nm_pasien: p.nm_pasien, status: 'run', detail_json: [], error_msg: '' });
+    var p   = bbQueue.shift();
+    var nrc = p.no_rawat.replace(/\//g,'');
+
+    // Skip langsung tanpa request ke server
+    if (p.status === 'skip') {
+        upsert(p);
+        $.get(baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token, function(res) {
+            updateUI(typeof res === 'string' ? JSON.parse(res) : res);
+            setTimeout(processOne, 50);
+        });
+        return;
+    }
+
+    upsert({ no_rawat: p.no_rawat, nm_pasien: p.nm_pasien, status: 'run', detail_json: [], error_msg: '' });
     $('#bb-status-txt').text('Memproses: ' + p.nm_pasien);
     $('#bb-footer').html('<i class="fa fa-circle-o-notch fa-spin" style="color:#2563eb;"></i> ' + p.nm_pasien);
 
-    var nrc = p.no_rawat.replace(/\//g,'');
     $.ajax({
         url: baseURL + '/satu_sehat/processbunban/' + nrc + '?t=' + mlite.token,
-        type: 'GET',
-        timeout: 120000,
+        type: 'GET', timeout: 120000,
         success: function(res) {
             var d = typeof res === 'string' ? JSON.parse(res) : res;
-            if (!d) d = { success: false, status: 'error', nm_pasien: p.nm_pasien, message: 'Response tidak valid', resources: [] };
-            upsertItem({
-                no_rawat:    p.no_rawat,
-                nm_pasien:   d.nm_pasien || p.nm_pasien,
-                status:      d.status || (d.success ? 'done' : 'error'),
-                detail_json: d.resources || [],
-                error_msg:   d.success ? '' : d.message,
-            });
-            // Update progress dari server
-            $.ajax({
-                url: baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token,
-                success: function(sr) {
-                    var sd = typeof sr === 'string' ? JSON.parse(sr) : sr;
-                    updateUI(sd);
-                    setTimeout(processOne, 200);
-                },
-                error: function() { setTimeout(processOne, 500); }
-            });
+            if (!d) d = { success:false, status:'error', nm_pasien:p.nm_pasien, message:'Response tidak valid', resources:[] };
+            upsert({ no_rawat:p.no_rawat, nm_pasien:d.nm_pasien||p.nm_pasien, status:d.status||(d.success?'done':'error'), detail_json:d.resources||[], error_msg:d.success?'':d.message });
+            $.get(baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token, function(sr) {
+                updateUI(typeof sr === 'string' ? JSON.parse(sr) : sr);
+                setTimeout(processOne, 200);
+            }).fail(function(){ setTimeout(processOne, 500); });
         },
         error: function(xhr, st) {
-            upsertItem({ no_rawat: p.no_rawat, nm_pasien: p.nm_pasien, status: 'error', detail_json: [], error_msg: 'AJAX error: ' + st });
+            upsert({ no_rawat:p.no_rawat, nm_pasien:p.nm_pasien, status:'error', detail_json:[], error_msg:'AJAX error: '+st });
             setTimeout(processOne, 500);
         }
     });
 }
 
-function finishAll(data) {
-    $('#bb-pbar').addClass('sukses').css('width','100%');
-    $('#bb-pct-txt').text('100%');
-    $('#bb-status-txt').text('Selesai! ' + data.sukses + ' sukses, ' + data.skip + ' skip, ' + data.error + ' error.');
-    $('#bb-footer').html('<i class="fa fa-check-circle" style="color:#10b981;"></i> Pengiriman selesai.');
-    $('#btn-stop-bunban').hide(); $('#btn-stop-bunban2').hide(); $('#btn-stop-all').hide();
-    $('#btn-close-bunban').show(); $('#btn-close-bunban2').show();
-    $('#btn-reset-bunban').show();
-    $('#bb-batch-ctrl').hide();
-}
+// ── Cari Pasien ──
+$(document).on('click', '#btn-cari-pasien', function() {
+    var tgl  = $('#bb-tgl').val();
+    var nama = $('#bb-cari-nama').val().trim();
+    if (!tgl) { alert('Pilih tanggal terlebih dahulu!'); return; }
 
-function startNextBatch() {
-    $('#bb-batch-ctrl').hide();
-    // Ambil pending berikutnya dari DB
+    $(this).html('<i class="fa fa-spinner fa-spin"></i>').prop('disabled', true);
     $.ajax({
-        url: baseURL + '/satu_sehat/statusbunban/' + bbPeriode + '?t=' + mlite.token,
+        url: baseURL + '/satu_sehat/searchpasienbunban/' + encodeURIComponent(tgl) + '/' + encodeURIComponent(nama || '-') + '?t=' + mlite.token,
         success: function(res) {
             var d = typeof res === 'string' ? JSON.parse(res) : res;
-            var pending = (d.pasien || []).filter(function(p) { return p.status === 'pending'; });
-            bbQueue = pending.slice(0, bbBatch);
-            if (bbQueue.length === 0) { finishAll(d); return; }
-            $('#bb-status-txt').text('Batch berikutnya: ' + bbQueue.length + ' pasien');
-            processOne();
-        }
-    });
-}
-
-// ── Event: Mulai ──
-$(document).on('click', '#btn-start-bunban', function() {
-    bbStopped = false;
-    bbPeriode = $('#bb-tgl').val() || '{?=date("Y-m-d")?>}';
-    bbBatch   = parseInt($('#bb-batch').val()) || 10;
-    bbOffset  = 0;
-
-    $('#bb-periode-lbl').text('— ' + bbPeriode);
-    $('#bb-settings-panel').hide();
-    $('#bb-progress-panel').show();
-    $('#bb-list').html('');
-    $('#bb-pbar').css('width','5%').removeClass('sukses error');
-    $('#bb-status-txt').text('Mendaftarkan pasien...');
-    $('#bb-footer').html('<i class="fa fa-spinner fa-spin" style="color:#2563eb;"></i> Memuat daftar...');
-    $('#btn-stop-bunban2').show();
-    $('#btn-close-bunban').hide();
-
-    $.ajax({
-        url: baseURL + '/satu_sehat/startbunban?t=' + mlite.token,
-        type: 'POST',
-        data: { periode: bbPeriode, batch_size: bbBatch },
-        success: function(res) {
-            var d = typeof res === 'string' ? JSON.parse(res) : res;
-            if (!d || !d.total) {
-                $('#bb-status-txt').text('Tidak ada pasien pada tanggal ini.');
-                $('#btn-close-bunban').show(); $('#btn-stop-bunban2').hide();
+            $('#btn-cari-pasien').html('<i class="fa fa-search"></i> Cari').prop('disabled', false);
+            if (!d.data || !d.data.length) {
+                $('#bb-search-tbody').html('<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:12px;">Tidak ada pasien ditemukan</td></tr>');
+                $('#bb-search-result').show();
+                $('#bb-search-info').text('');
                 return;
             }
-
-            bbTotal = d.total;
-            updateUI(d);
-
-            // Render semua pasien ke list
-            (d.all || []).forEach(function(p) { upsertItem(p); });
-
-            // Ambil batch pertama dari pending
-            var pending = (d.all || []).filter(function(p) { return p.status === 'pending'; });
-            bbQueue = pending.slice(0, bbBatch);
-
-            if (bbQueue.length === 0) {
-                finishAll(d);
-                return;
-            }
-
-            $('#bb-status-txt').text('Memulai batch ' + bbQueue.length + ' pasien...');
-            processOne();
+            var html = '';
+            d.data.forEach(function(p) {
+                var badgeHtml = p.status === 'done'
+                    ? '<span class="badge-done">Sudah Terkirim</span>'
+                    : '<span class="badge-pending">Belum Terkirim</span>';
+                html += '<tr>'
+                    + '<td><input type="checkbox" class="bb-chk" value="' + p.no_rawat_key + '" data-nm="' + p.nm_pasien + '" data-nr="' + p.no_rawat + '" data-status="' + p.status + '"' + (p.status==='done'?' disabled':'') + '></td>'
+                    + '<td>' + p.no_rawat + '</td>'
+                    + '<td>' + p.no_rkm_medis + '</td>'
+                    + '<td>' + p.nm_pasien + '</td>'
+                    + '<td>' + badgeHtml + '</td>'
+                    + '</tr>';
+            });
+            $('#bb-search-tbody').html(html);
+            $('#bb-search-info').text(d.total + ' pasien ditemukan — ' + d.data.filter(function(p){ return p.status==='pending'; }).length + ' belum terkirim');
+            $('#bb-search-result').show();
         },
         error: function() {
-            $('#bb-status-txt').text('Gagal mendaftarkan pasien.');
-            $('#btn-close-bunban').show(); $('#btn-stop-bunban2').hide();
+            $('#btn-cari-pasien').html('<i class="fa fa-search"></i> Cari').prop('disabled', false);
+            alert('Gagal mencari pasien. Coba lagi.');
         }
     });
 });
 
-// ── Event: Next batch manual ──
-$(document).on('click', '#btn-next-batch', startNextBatch);
-
-// ── Event: Stop ──
-$(document).on('click', '#btn-stop-bunban, #btn-stop-bunban2, #btn-stop-all', function() {
-    bbStopped = true;
-    bbQueue   = [];
-    $('#bb-batch-ctrl').hide();
-    $(this).hide();
-    $('#btn-stop-bunban').hide(); $('#btn-stop-bunban2').hide(); $('#btn-stop-all').hide();
-    $('#btn-close-bunban').show();
-    $('#bb-footer').html('<i class="fa fa-stop" style="color:#ef4444;"></i> Dihentikan pengguna.');
+$(document).on('click', '#btn-check-all', function() {
+    $('.bb-chk:not(:disabled)').prop('checked', true);
+});
+$(document).on('click', '#btn-uncheck-all', function() {
+    $('.bb-chk').prop('checked', false);
 });
 
-// ── Event: Reset ──
-$(document).on('click', '#btn-reset-bunban', function() {
-    if (!confirm('Reset job queue untuk ' + bbPeriode + '?\nSemua status akan dihapus dan dikirim ulang.')) return;
-    $.ajax({
-        url: baseURL + '/satu_sehat/resetbunban?t=' + mlite.token,
-        type: 'POST',
-        data: { periode: bbPeriode },
-        success: function() {
-            $('#bb-progress-panel').hide();
-            $('#bb-settings-panel').show();
-            $('#btn-reset-bunban').hide();
-            $('#btn-close-bunban').hide();
-            $('#btn-close-bunban2').show();
-            $('#bb-list').html('');
-            $('#bb-status-txt').text('');
-        }
+// ── Mulai Kirim ──
+$(document).on('click', '#btn-start-bunban', function() {
+    bbStopped = false;
+    bbPeriode = $('#bb-tgl').val();
+    bbBatch   = $('#bb-batch').val();
+    if (!bbPeriode) { alert('Pilih tanggal terlebih dahulu!'); return; }
+
+    // Ambil pasien yang dicentang (kalau ada)
+    var checked = [];
+    $('.bb-chk:checked').each(function() {
+        checked.push({ nrc: $(this).val(), nm: $(this).data('nm'), nr: $(this).data('nr') });
     });
-});
 
-// ── Estimasi waktu ──
-function hitungEstimasi() {
-    var batch = $('#bb-batch').val();
-    var tgl   = $('#bb-tgl').val();
-    if (!tgl) return;
-    var msg = '';
-    if (batch === 'all') {
-        msg = '<i class="fa fa-warning" style="color:#f59e0b;"></i> <strong>All</strong> — semua pasien akan dikirim. Pastikan koneksi stabil!';
+    $('#bb-periode-lbl').text('— ' + bbPeriode);
+    $('#bb-settings').hide(); $('#bb-progress').show();
+    $('#bb-list').html(''); $('#bb-pbar').css('width','5%').removeClass('done');
+    $('#bb-status-txt').text('Mendaftarkan pasien...');
+    $('#bb-footer').html('<i class="fa fa-spinner fa-spin" style="color:#2563eb;"></i> Memuat...');
+    $('#btn-stop-bunban').show(); $('#btn-reset-bunban').hide();
+
+    var postData = { periode: bbPeriode, batch_size: bbBatch };
+    if (checked.length > 0) {
+        checked.forEach(function(c) { postData['no_rawat_list[]'] = postData['no_rawat_list[]'] || []; });
+        // jQuery serialisasi array
+        var formData = 'periode=' + encodeURIComponent(bbPeriode) + '&batch_size=' + encodeURIComponent(bbBatch);
+        checked.forEach(function(c) { formData += '&no_rawat_list[]=' + encodeURIComponent(c.nrc); });
+
+        $.ajax({
+            url: baseURL + '/satu_sehat/startbunban?t=' + mlite.token,
+            type: 'POST', data: formData,
+            success: handleStartResponse,
+            error: handleStartError,
+        });
     } else {
-        var n   = parseInt(batch) || 10;
-        var est = n * 45;
-        var mnt = Math.ceil(est / 60);
-        msg = '<i class="fa fa-clock-o"></i> Estimasi: ~' + mnt + ' menit'
-            + ' &nbsp;&bull;&nbsp; Batch kecil = lebih aman, batch besar = lebih cepat.';
+        $.ajax({
+            url: baseURL + '/satu_sehat/startbunban?t=' + mlite.token,
+            type: 'POST', data: postData,
+            success: handleStartResponse,
+            error: handleStartError,
+        });
     }
+});
+
+function handleStartResponse(res) {
+    var d = typeof res === 'string' ? JSON.parse(res) : res;
+    if (!d || !d.total) {
+        $('#bb-status-txt').text('Tidak ada pasien untuk diproses.');
+        $('#btn-stop-bunban').hide();
+        return;
+    }
+    bbTotal = d.total;
+    updateUI(d);
+    bbQueue = [];
+    (d.all||[]).forEach(function(p) {
+        upsert(p);
+        bbQueue.push(p); // semua masuk queue, skip akan dihandle di processOne
+    });
+    processOne();
+}
+
+function handleStartError() {
+    $('#bb-status-txt').text('Gagal mendaftarkan pasien.');
+    $('#btn-stop-bunban').hide();
+}
+
+$(document).on('click', '#btn-stop-bunban', function() {
+    bbStopped = true; bbQueue = [];
+    $(this).hide();
+    $('#bb-footer').html('<i class="fa fa-stop" style="color:#ef4444;"></i> Dihentikan pengguna.');
+    $('#btn-reset-bunban').show();
+});
+
+$(document).on('click', '#btn-reset-bunban', function() {
+    if (!confirm('Reset dan mulai ulang untuk ' + bbPeriode + '?')) return;
+    $.post(baseURL + '/satu_sehat/resetbunban?t=' + mlite.token, { periode: bbPeriode }, function() {
+        $('#bb-progress').hide(); $('#bb-settings').show();
+        $('#btn-reset-bunban').hide(); $('#bb-list').html('');
+        $('#bb-search-result').hide(); $('#bb-search-tbody').html('');
+        $('.bb-chk').prop('checked', false);
+    });
+});
+
+$(document).on('click', '.bb-batch-opt', function() {
+    $('.bb-batch-opt').removeClass('active');
+    $(this).addClass('active');
+    $('#bb-batch').val($(this).data('val'));
+    hitungEstimasi();
+});
+
+function hitungEstimasi() {
+    var checked = $('.bb-chk:checked').length;
+    if (checked > 0) {
+        $('#bb-estimasi').html('<i class="fa fa-users"></i> <strong>' + checked + ' pasien</strong> dipilih dari pencarian. Estimasi: ~' + Math.ceil(checked * 45 / 60) + ' menit');
+        return;
+    }
+    var val = $('#bb-batch').val();
+    var msg = val === 'all'
+        ? '<i class="fa fa-warning" style="color:#f59e0b;"></i> <strong>Semua</strong> pasien pada tanggal ini akan dikirim.'
+        : '<i class="fa fa-clock-o"></i> Estimasi: ~' + Math.ceil(parseInt(val) * 45 / 60) + ' menit';
     $('#bb-estimasi').html(msg);
 }
-$('#bb-batch, #bb-tgl').on('change', hitungEstimasi);
 
-// ── Open modal helper ──
-// Include syntax yang benar di response.html:
-// {include: ../plugins/satu_sehat/view/admin/bunban.html}
+$(document).on('change', '.bb-chk, #bb-tgl', hitungEstimasi);
 
 window.openBunbanModal = function(tgl) {
     var t = tgl || $('#tanggal_awal').val() || new Date().toISOString().slice(0,10);
     $('#bb-tgl').val(t);
-    $('#bb-settings-panel').show();
-    $('#bb-progress-panel').hide();
-    $('#btn-reset-bunban').hide();
-    $('#btn-close-bunban').hide();
-    $('#btn-stop-bunban2').hide();
+    $('#bb-settings').show(); $('#bb-progress').hide();
+    $('#btn-reset-bunban, #btn-stop-bunban').hide();
     $('#bb-periode-lbl').text('');
+    $('#bb-search-result').hide(); $('#bb-search-tbody').html('');
+    $('#bb-list').html('');
     hitungEstimasi();
     $('#bunbanModal').modal('show');
 };

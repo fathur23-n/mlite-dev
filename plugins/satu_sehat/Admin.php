@@ -1708,32 +1708,31 @@ public function postDeleteStudy()
     ob_start();
  
     $src_path = __DIR__ . '/src/';
-    foreach (['Composition','Respiratory','Temperature','Observation','Condition','Procedure',
-              'CarePlan','ClinicalImpression','Medication','MedicationRequest','MedicationDispense',
-              'QuestionareMedication','ServiceRequest','Specimen','DiagnosticReport'] as $cls) {
+    foreach ([
+        'Composition', 'Respiratory', 'Temperature', 'Observation',
+        'Condition', 'Procedure', 'CarePlan', 'ClinicalImpression',
+        'Medication', 'MedicationRequest', 'MedicationDispense',
+        'QuestionareMedication', 'ServiceRequest', 'Specimen', 'DiagnosticReport',
+    ] as $cls) {
         if (file_exists($src_path . $cls . '.php')) require_once $src_path . $cls . '.php';
     }
  
-    // ── Zona waktu ──
     $zonawaktu = '+07:00';
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WITA') $zonawaktu = '+08:00';
     if ($this->settings->get('satu_sehat.zonawaktu') == 'WIT')  $zonawaktu = '+09:00';
  
-    // ── Data dasar ──
     $no_rawat       = revertNoRawat($no_rawat);
     $kd_poli        = $this->core->getRegPeriksaInfo('kd_poli', $no_rawat);
     $nm_poli        = $this->core->getPoliklinikInfo('nm_poli', $kd_poli);
     $kd_dokter      = $this->core->getRegPeriksaInfo('kd_dokter', $no_rawat);
+    $no_ktp_dokter  = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id')->where('kd_dokter', $kd_dokter)->oneArray();
     $nama_dokter    = $this->core->getPegawaiInfo('nama', $kd_dokter);
     $no_rkm_medis   = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
-    $nama_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
     $no_ktp_pasien  = $this->core->getPasienInfo('no_ktp', $no_rkm_medis);
+    $nama_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
     $status_lanjut  = $this->core->getRegPeriksaInfo('status_lanjut', $no_rawat);
     $tgl_registrasi = $this->core->getRegPeriksaInfo('tgl_registrasi', $no_rawat);
     $jam_reg        = $this->core->getRegPeriksaInfo('jam_reg', $no_rawat);
- 
-    $no_ktp_dokter = $this->db('mlite_satu_sehat_mapping_praktisi')
-        ->select('practitioner_id')->where('kd_dokter', $kd_dokter)->oneArray();
  
     $inProg = $this->db('pemeriksaan_ralan')
         ->select(['tgl' => 'tgl_perawatan', 'jam' => 'jam_rawat', 'respirasi' => 'respirasi',
@@ -1745,42 +1744,43 @@ public function postDeleteStudy()
         ->join('penyakit', 'penyakit.kd_penyakit=diagnosa_pasien.kd_penyakit')
         ->where('no_rawat', $no_rawat)
         ->where('diagnosa_pasien.status', $status_lanjut)
-        ->where('prioritas', '1')->oneArray();
+        ->where('prioritas', '1')
+        ->oneArray();
  
-    $_prosedur = $this->db('prosedur_pasien')
+    $_prosedure_pasien = $this->db('prosedur_pasien')
         ->select(['deskripsi_pendek' => 'icd9.deskripsi_pendek', 'kode' => 'icd9.kode'])
         ->join('icd9', 'icd9.kode = prosedur_pasien.kode')
         ->where('prosedur_pasien.no_rawat', $no_rawat)
         ->where('prosedur_pasien.status', 'Ralan')
-        ->where('prosedur_pasien.prioritas', '1')->oneArray();
-    $prosedure_pasien      = $_prosedur['deskripsi_pendek'] ?? '';
-    $kode_prosedure_pasien = $_prosedur['kode'] ?? '';
+        ->where('prosedur_pasien.prioritas', '1')
+        ->oneArray();
+    $prosedure_pasien      = $_prosedure_pasien['deskripsi_pendek'] ?? '';
+    $kode_prosedure_pasien = $_prosedure_pasien['kode'] ?? '';
     if ($kode_prosedure_pasien !== '' && strpos($kode_prosedure_pasien, '.') === false && strlen($kode_prosedure_pasien) >= 2) {
         $kode_prosedure_pasien = substr_replace($kode_prosedure_pasien, '.', 2, 0);
     }
  
-    // ── Billing ──
     $billing_row = $this->db('billing')->where('no_rawat', $no_rawat)->desc('tgl_byr')->oneArray();
     $tgl_billing = $billing_row['tgl_byr'] ?? $tgl_registrasi;
     $jam_billing = '23:59:59';
  
-    // ── Kunjungan type ──
     $kunjungan = 'Kunjungan'; $code = 'AMB'; $display = 'ambulatory';
     if ($status_lanjut == 'Ranap') {
-        $kunjungan = 'Perawatan'; $code = 'IMP'; $display = 'inpatient encounter';
-        $kd_poli   = $this->core->getKamarInapInfo('kd_kamar', $no_rawat);
-        $nm_poli   = $this->core->getBangsalInfo('nm_bangsal', $this->core->getKamarInfo('kd_bangsal', $kd_poli));
+        $kunjungan  = 'Perawatan'; $code = 'IMP'; $display = 'inpatient encounter';
+        $kd_poli    = $this->core->getKamarInapInfo('kd_kamar', $no_rawat);
+        $kd_bangsal = $this->core->getKamarInfo('kd_bangsal', $kd_poli);
+        $nm_poli    = $this->core->getBangsalInfo('nm_bangsal', $kd_bangsal);
     }
  
-    // ── Lokasi ──
-    $lokasi_row = $status_lanjut == 'Ranap'
-        ? ($this->db('satu_sehat_mapping_lokasi_ranap')->where('kd_kamar', $kd_poli)->oneArray()
-            ?: $this->db('satu_sehat_mapping_lokasi_ranap')->oneArray())
-        : ($this->db('satu_sehat_mapping_lokasi_ralan')->where('kd_poli', $kd_poli)->oneArray()
-            ?: $this->db('satu_sehat_mapping_lokasi_ralan')->oneArray());
+    if ($status_lanjut == 'Ranap') {
+        $lokasi_row = $this->db('satu_sehat_mapping_lokasi_ranap')->where('kd_kamar', $kd_poli)->oneArray();
+        if (empty($lokasi_row)) $lokasi_row = $this->db('satu_sehat_mapping_lokasi_ranap')->oneArray();
+    } else {
+        $lokasi_row = $this->db('satu_sehat_mapping_lokasi_ralan')->where('kd_poli', $kd_poli)->oneArray();
+        if (empty($lokasi_row)) $lokasi_row = $this->db('satu_sehat_mapping_lokasi_ralan')->oneArray();
+    }
     $id_lokasi_satusehat = $lokasi_row['id_lokasi_satusehat'] ?? '';
  
-    // ── UUID pool ──
     $uuid_encounter                     = $this->gen_uuid();
     $uuid_condition                     = $this->gen_uuid();
     $uuid_respiration                   = $this->gen_uuid();
@@ -1793,79 +1793,84 @@ public function postDeleteStudy()
     $uuid_clinical_impression_history   = $this->gen_uuid();
     $uuid_clinical_impression_prognosis = $this->gen_uuid();
  
-    // ── IHS Patient ──
     $ihs_patient   = '';
     $__patientJson = json_decode($this->getPatient($no_ktp_pasien));
     if (is_object($__patientJson) && isset($__patientJson->entry[0]->resource->id)) {
         $ihs_patient = $__patientJson->entry[0]->resource->id;
     }
  
-    $tgl_inprog = $inProg['tgl'] ?? $tgl_registrasi;
-    $jam_inprog = $inProg['jam'] ?? '00:00:00';
+    $tensi    = $inProg['tensi'] ?? '';
+    $sistole  = strtok($tensi, '/');
+    $diastole = substr($tensi, strpos($tensi, '/') + 1);
  
-    // ── TTV: Tensi ──
-    $tensi         = $inProg['tensi'] ?? '';
     $diastole_json = ''; $sistole_json = '';
     if (!empty($tensi) && $tensi !== '-') {
-        $sistole  = strtok($tensi, '/');
-        $diastole = substr($tensi, strpos($tensi, '/') + 1);
-        $tgl_jam_ttv = $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu;
+        $tgl_jam_ttv = $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu;
         $diastole_json = '{
-        "fullUrl":"urn:uuid:' . $uuid_diastolik . '","resource":{"resourceType":"Observation","status":"final",
-        "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs","display":"Vital Signs"}]}],
-        "code":{"coding":[{"system":"http://loinc.org","code":"8462-4","display":"Diastolic blood pressure"}]},
-        "subject":{"reference":"Patient/' . $ihs_patient . '"},"performer":[{"reference":"Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '"}],
-        "encounter":{"reference":"urn:uuid:' . $uuid_encounter . '","display":"Pemeriksaan Fisik Diastolik ' . $nama_pasien . ' di ' . $tgl_registrasi . '"},
-        "effectiveDateTime":"' . $tgl_jam_ttv . '","issued":"' . $tgl_jam_ttv . '",
-        "bodySite":{"coding":[{"system":"http://snomed.info/sct","code":"368209003","display":"Right arm"}]},
-        "valueQuantity":{"value":' . (float)$diastole . ',"unit":"mm[Hg]","system":"http://unitsofmeasure.org","code":"mm[Hg]"},
-        "interpretation":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation","code":"L","display":"low"}],"text":"Di bawah nilai referensi"}]
-        },"request":{"method":"POST","url":"Observation"}},';
+        "fullUrl": "urn:uuid:' . $uuid_diastolik . '",
+        "resource": {
+            "resourceType": "Observation","status": "final",
+            "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category","code": "vital-signs","display": "Vital Signs"}]}],
+            "code": {"coding": [{"system": "http://loinc.org","code": "8462-4","display": "Diastolic blood pressure"}]},
+            "subject": {"reference": "Patient/' . $ihs_patient . '"},
+            "performer": [{"reference": "Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '"}],
+            "encounter": {"reference": "urn:uuid:' . $uuid_encounter . '","display": "Pemeriksaan Fisik Diastolik ' . $nama_pasien . ' di ' . $tgl_registrasi . '"},
+            "effectiveDateTime": "' . $tgl_jam_ttv . '","issued": "' . $tgl_jam_ttv . '",
+            "bodySite": {"coding": [{"system": "http://snomed.info/sct","code": "368209003","display": "Right arm"}]},
+            "valueQuantity": {"value": ' . (float)$diastole . ',"unit": "mm[Hg]","system": "http://unitsofmeasure.org","code": "mm[Hg]"},
+            "interpretation": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation","code": "L","display": "low"}],"text": "Di bawah nilai referensi"}]
+        },"request": {"method": "POST","url": "Observation"}},';
         $sistole_json = '{
-        "fullUrl":"urn:uuid:' . $uuid_sistolik . '","resource":{"resourceType":"Observation","status":"final",
-        "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"vital-signs","display":"Vital Signs"}]}],
-        "code":{"coding":[{"system":"http://loinc.org","code":"8480-6","display":"Systolic blood pressure"}]},
-        "subject":{"reference":"Patient/' . $ihs_patient . '"},"performer":[{"reference":"Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '"}],
-        "encounter":{"reference":"urn:uuid:' . $uuid_encounter . '","display":"Pemeriksaan Fisik Sistole ' . $nama_pasien . ' di ' . $tgl_registrasi . '"},
-        "effectiveDateTime":"' . $tgl_jam_ttv . '","issued":"' . $tgl_jam_ttv . '",
-        "valueQuantity":{"value":' . (float)$sistole . ',"unit":"mm[Hg]","system":"http://unitsofmeasure.org","code":"mm[Hg]"}
-        },"request":{"method":"POST","url":"Observation"}},';
+        "fullUrl": "urn:uuid:' . $uuid_sistolik . '",
+        "resource": {
+            "resourceType": "Observation","status": "final",
+            "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category","code": "vital-signs","display": "Vital Signs"}]}],
+            "code": {"coding": [{"system": "http://loinc.org","code": "8480-6","display": "Systolic blood pressure"}]},
+            "subject": {"reference": "Patient/' . $ihs_patient . '"},
+            "performer": [{"reference": "Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '"}],
+            "encounter": {"reference": "urn:uuid:' . $uuid_encounter . '","display": "Pemeriksaan Fisik Sistole ' . $nama_pasien . ' di ' . $tgl_registrasi . '"},
+            "effectiveDateTime": "' . $tgl_jam_ttv . '","issued": "' . $tgl_jam_ttv . '",
+            "valueQuantity": {"value": ' . (float)$sistole . ',"unit": "mm[Hg]","system": "http://unitsofmeasure.org","code": "mm[Hg]"}
+        },"request": {"method": "POST","url": "Observation"}},';
     }
  
-    // ── TTV: Respirasi ──
+    $composition_json = '';
+    try {
+        $zonaWaktu_composition = $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu;
+        $composition = new Composition($uuid_encounter, $uuid_composition, $ihs_patient, $no_ktp_dokter['practitioner_id'] ?? '', $nama_pasien, $nama_dokter, $no_rawat, $this->organizationid, "Kunjungan " . $nama_pasien . " di tanggal " . $tgl_registrasi, $zonaWaktu_composition);
+        $composition_json = $composition->toJson();
+    } catch (\Exception $e) {}
+ 
     $respiratory_json = '';
     try {
         if (!in_array($inProg['respirasi'] ?? '', ['', '-'])) {
-            $zonaWaktu = $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu;
+            $zonaWaktu = $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu;
             $respiratory = new Respiratory($uuid_encounter, $uuid_respiration, $ihs_patient, $no_ktp_dokter['practitioner_id'] ?? '', $inProg['respirasi'], $zonaWaktu, "Pemeriksaan Fisik Pernafasan " . $nama_pasien . " di " . $tgl_registrasi);
             $respiratory_json = $respiratory->toJson();
         }
     } catch (\Exception $e) {}
  
-    // ── TTV: Suhu ──
     $temperatur_json = '';
     try {
         if (!empty($inProg['suhu'])) {
             $value_temp = 'N'; $display_temp = 'Normal'; $text_temp = 'antara';
             if ($inProg['suhu'] > 37) { $value_temp = 'H'; $display_temp = 'High'; $text_temp = 'atas'; }
             if ($inProg['suhu'] < 36) { $value_temp = 'L'; $display_temp = 'Low';  $text_temp = 'bawah'; }
-            $zonaWaktu = $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu;
+            $zonaWaktu = $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu;
             $suhu = new Temperature($uuid_encounter, $uuid_suhu, $ihs_patient, $no_ktp_dokter['practitioner_id'] ?? '', str_replace(',', '.', $inProg['suhu']), "Pemeriksaan Fisik Suhu " . $nama_pasien . " di " . $tgl_registrasi, $value_temp, $display_temp, $text_temp, $zonaWaktu);
             $temperatur_json = $suhu->toJson();
         }
     } catch (\Exception $e) {}
  
-    // ── TTV: Nadi ──
     $heart_rate_json = '';
     try {
         if (!in_array($inProg['nadi'] ?? '', ['', '-'])) {
-            $zonaWaktu = $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu;
+            $zonaWaktu = $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu;
             $nadi = new Observation($uuid_encounter, $uuid_nadi, $ihs_patient, $no_ktp_dokter['practitioner_id'] ?? '', $inProg['nadi'], $zonaWaktu, "Pemeriksaan Fisik Nadi " . $nama_pasien . " di " . $tgl_registrasi, 'nadi');
             $heart_rate_json = $nadi->toJsonBundle() . ',';
         }
     } catch (\Exception $e) {}
  
-    // ── Condition ──
     $condition_json = '';
     try {
         if (!empty($diagnosa_pasien['kd_penyakit'])) {
@@ -1874,52 +1879,25 @@ public function postDeleteStudy()
         }
     } catch (\Exception $e) {}
  
-    // ── Procedure ──
     $procedure_json = '';
     try {
         if ($prosedure_pasien) {
-            $zonaWaktu = $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu;
+            $zonaWaktu = $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu;
             $procedure = new Procedure($uuid_encounter, $uuid_procedure, $kode_prosedure_pasien, $prosedure_pasien, $ihs_patient, $nama_pasien, "Tindakan pada " . $nama_pasien . " di tanggal " . $tgl_registrasi, $zonaWaktu, $no_ktp_dokter['practitioner_id'] ?? '', $nama_dokter, $diagnosa_pasien['kd_penyakit'] ?? '', $diagnosa_pasien['nm_penyakit'] ?? '');
             $procedure_json = $procedure->toJson();
         }
     } catch (\Exception $e) {}
  
-    // ── Clinical Impression ──
-    $clinical_impression_json_history = '';
-    try {
-        if (!empty($inProg['keluhan'])) {
-            $ci = new ClinicalImpression($this->organizationid, $uuid_clinical_impression_history, $no_rawat, $ihs_patient, $nama_pasien, $uuid_encounter, $inProg['keluhan'], "in-progress");
-            $clinical_impression_json_history = $ci->toJsonBundle() . ',';
-        }
-    } catch (\Exception $e) {}
- 
-    $clinical_impression_json_prognosis = '';
-    try {
-        if (!empty($inProg['penilaian'])) {
-            $ci = new ClinicalImpression($this->organizationid, $uuid_clinical_impression_prognosis, $no_rawat, $ihs_patient, $nama_pasien, $uuid_encounter, $inProg['penilaian'], "completed");
-            $clinical_impression_json_prognosis = $ci->toJsonBundle() . ',';
-        }
-    } catch (\Exception $e) {}
- 
-    // ── Composition ──
-    $composition_json = '';
-    try {
-        $zonaWaktu_composition = $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu;
-        $composition = new Composition($uuid_encounter, $uuid_composition, $ihs_patient, $no_ktp_dokter['practitioner_id'] ?? '', $nama_pasien, $nama_dokter, $no_rawat, $this->organizationid, "Kunjungan " . $nama_pasien . " di tanggal " . $tgl_registrasi, $zonaWaktu_composition);
-        $composition_json = $composition->toJson();
-    } catch (\Exception $e) {}
- 
-    // ── CarePlan Ranap ──
     $careplan_json = '';
     try {
-        if ($this->db('kamar_inap')->where('no_rawat', $no_rawat)->oneArray()) {
+        $cek_ranap = $this->db('kamar_inap')->where('no_rawat', $no_rawat)->oneArray();
+        if ($cek_ranap) {
             $uuid_careplan = $this->gen_uuid();
             $careplan = new CarePlan($ihs_patient, $uuid_encounter, $uuid_careplan, "Pasien Dirawat Inapkan", "Rawat Inap", $no_ktp_dokter['practitioner_id'] ?? '');
             $careplan_json = $careplan->toJsonBundle() . ',';
         }
     } catch (\Exception $e) {}
  
-    // ── Medication Request ──
     $medicationforrequest_json = ''; $medicationrequest_json = ''; $medicationrequest_ids = [];
     try {
         $no = 1;
@@ -1927,89 +1905,104 @@ public function postDeleteStudy()
         foreach ($cek_resep as $value) {
             try {
                 $cek_obat = $this->db('satu_sehat_mapping_obat')->where('kode_brng', $value['kode_brng'])->oneArray();
-                if (!$cek_obat) continue;
-                $uuid_medication = $this->gen_uuid(); $uuid_medicationrequest = $this->gen_uuid();
-                $system_cek = in_array($cek_obat['satuan_den'], ['385057009','421366001']) ? 'http://snomed.info/sct' : 'http://terminology.hl7.org/CodeSystem/v3-orderableDrugForm';
-                $medication = new Medication($uuid_medication, $this->organizationid, $no_rawat, $cek_obat['kode_kfa'], $cek_obat['nama_kfa'], $cek_obat['kode_sediaan'], $cek_obat['nama_sediaan'], $cek_obat['kode_bahan'], $cek_obat['nama_bahan'], $cek_obat['satuan_num'], $cek_obat['numerator'], $cek_obat['satuan_den'], $system_cek, $value['jml'], $no . $this->ran_char());
-                $medicationforrequest_json .= $medication->toJson();
-                $time_authored = $this->convertTimeSatset($value['tgl_peresepan'] . ' ' . $value['jam_peresepan']) . $zonawaktu;
-                $medicationrequest = new MedicationRequest($uuid_medication, $uuid_medicationrequest, $this->organizationid, $value['no_resep'], $cek_obat['nama_kfa'], $ihs_patient, $nama_pasien, $time_authored, $no_ktp_dokter['practitioner_id'] ?? '', $nama_dokter, $uuid_condition, $uuid_encounter, $diagnosa_pasien['nm_penyakit'] ?? '', $value['aturan_pakai'], $cek_obat['kode_route'], $cek_obat['nama_route'], $value['jml'], $cek_obat['satuan_den'], $system_cek, $cek_obat['satuan_den'], $no . $this->ran_char());
-                $medicationrequest_json .= $medicationrequest->toJson();
-                if (!empty($value['kode_brng'])) $medicationrequest_ids[$value['kode_brng']] = $uuid_medicationrequest;
-                $no++;
+                if ($cek_obat) {
+                    $uuid_medication = $this->gen_uuid(); $uuid_medicationrequest = $this->gen_uuid();
+                    $system_cek = in_array($cek_obat['satuan_den'], ['385057009', '421366001']) ? 'http://snomed.info/sct' : 'http://terminology.hl7.org/CodeSystem/v3-orderableDrugForm';
+                    $medication = new Medication($uuid_medication, $this->organizationid, $no_rawat, $cek_obat['kode_kfa'], $cek_obat['nama_kfa'], $cek_obat['kode_sediaan'], $cek_obat['nama_sediaan'], $cek_obat['kode_bahan'], $cek_obat['nama_bahan'], $cek_obat['satuan_num'], $cek_obat['numerator'], $cek_obat['satuan_den'], $system_cek, $value['jml'], $no . $this->ran_char());
+                    $medicationforrequest_json .= $medication->toJson();
+                    $time_authored = $this->convertTimeSatset($value['tgl_peresepan'] . ' ' . $value['jam_peresepan']) . $zonawaktu;
+                    $medicationrequest = new MedicationRequest($uuid_medication, $uuid_medicationrequest, $this->organizationid, $value['no_resep'], $cek_obat['nama_kfa'], $ihs_patient, $nama_pasien, $time_authored, $no_ktp_dokter['practitioner_id'] ?? '', $nama_dokter, $uuid_condition, $uuid_encounter, $diagnosa_pasien['nm_penyakit'] ?? '', $value['aturan_pakai'], $cek_obat['kode_route'], $cek_obat['nama_route'], $value['jml'], $cek_obat['satuan_den'], $system_cek, $cek_obat['satuan_den'], $no . $this->ran_char());
+                    $medicationrequest_json .= $medicationrequest->toJson();
+                    if (!empty($value['kode_brng'])) { $medicationrequest_ids[$value['kode_brng']] = $uuid_medicationrequest; }
+                    $no++;
+                }
             } catch (\Exception $e) { continue; }
         }
     } catch (\Exception $e) {}
  
-    // ── Medication Dispense ──
     $medicationfordispense_json = ''; $medicationdispense_json = '';
-    $id_praktisi_apoteker = ['practitioner_id' => $no_ktp_dokter['practitioner_id'] ?? '', 'kd_dokter' => $kd_dokter];
-    $nama_praktisi_apoteker = $nama_dokter;
     try {
         $no = 1;
-        $praktisi_apoteker = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id', 'kd_dokter')->where('jenis_praktisi', 'Apoteker')->toArray();
-        if (!empty($praktisi_apoteker)) {
-            $id_praktisi_apoteker   = $praktisi_apoteker[array_rand($praktisi_apoteker)];
-            $nama_praktisi_apoteker = $this->core->getPegawaiInfo('nama', $id_praktisi_apoteker['kd_dokter']);
-        }
         $cek_detail = $this->db('detail_pemberian_obat')->where('no_rawat', $no_rawat)->toArray();
+        $praktisi_apoteker = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id', 'kd_dokter')->where('jenis_praktisi', 'Apoteker')->toArray();
+        $id_praktisi_apoteker = (!is_array($praktisi_apoteker) || empty($praktisi_apoteker))
+            ? ['practitioner_id' => $no_ktp_dokter['practitioner_id'] ?? '', 'kd_dokter' => $kd_dokter]
+            : $praktisi_apoteker[array_rand($praktisi_apoteker)];
+        $nama_praktisi_apoteker = $this->core->getPegawaiInfo('nama', $id_praktisi_apoteker['kd_dokter'] ?? $kd_dokter);
         foreach ($cek_detail as $value) {
             try {
                 $cek_obat = $this->db('satu_sehat_mapping_obat')->where('kode_brng', $value['kode_brng'])->oneArray();
-                $cek_aturan = $this->db('aturan_pakai')->where('no_rawat', $no_rawat)->where('kode_brng', $value['kode_brng'])->where('jam', $value['jam'])->oneArray();
-                if (!$cek_obat || !$cek_aturan) continue;
-                $uuid_med_disp = $this->gen_uuid(); $uuid_meddisp = $this->gen_uuid();
-                $system_cek = in_array($cek_obat['satuan_den'], ['385057009','421366001']) ? 'http://snomed.info/sct' : 'http://terminology.hl7.org/CodeSystem/v3-orderableDrugForm';
-                $med_disp = new Medication($uuid_med_disp, $this->organizationid, $no_rawat, $cek_obat['kode_kfa'], $cek_obat['nama_kfa'], $cek_obat['kode_sediaan'], $cek_obat['nama_sediaan'], $cek_obat['kode_bahan'], $cek_obat['nama_bahan'], $cek_obat['satuan_num'], $cek_obat['numerator'], $cek_obat['satuan_den'], $system_cek, $value['jml'], $no . $this->ran_char());
-                $medicationfordispense_json .= $med_disp->toJson();
-                $time_disp = $this->convertTimeSatset($value['tgl_perawatan'] . ' ' . $value['jam']) . $zonawaktu;
-                $mr_uuid   = $medicationrequest_ids[$value['kode_brng']] ?? $this->gen_uuid();
-                $dispense  = new MedicationDispense($uuid_meddisp, $this->organizationid, $no_rawat, $uuid_med_disp, $cek_obat['nama_kfa'], $ihs_patient, $nama_pasien, $uuid_encounter, $id_praktisi_apoteker['practitioner_id'] ?? '', $nama_praktisi_apoteker, $id_lokasi_satusehat, $mr_uuid, $time_disp, $time_disp, $cek_aturan['aturan'] ?? '', $value['jml'], $cek_obat['satuan_den'], $system_cek, $cek_obat['satuan_den'], $no . $this->ran_char());
-                $medicationdispense_json .= $dispense->toJson();
-                $no++;
+                $cek_aturan_pakai = $this->db('aturan_pakai')->where('no_rawat', $no_rawat)->where('kode_brng', $value['kode_brng'])->where('jam', $value['jam'])->oneArray();
+                if ($cek_obat && $cek_aturan_pakai) {
+                    $uuid_medication_for_dispense = $this->gen_uuid(); $uuid_medication_dispense = $this->gen_uuid();
+                    $system_cek = in_array($cek_obat['satuan_den'], ['385057009', '421366001']) ? 'http://snomed.info/sct' : 'http://terminology.hl7.org/CodeSystem/v3-orderableDrugForm';
+                    $medication_for_dispense = new Medication($uuid_medication_for_dispense, $this->organizationid, $no_rawat, $cek_obat['kode_kfa'], $cek_obat['nama_kfa'], $cek_obat['kode_sediaan'], $cek_obat['nama_sediaan'], $cek_obat['kode_bahan'], $cek_obat['nama_bahan'], $cek_obat['satuan_num'], $cek_obat['numerator'], $cek_obat['satuan_den'], $system_cek, $value['jml'], $no . $this->ran_char());
+                    $medicationfordispense_json .= $medication_for_dispense->toJson();
+                    $time_prepared_handed = $this->convertTimeSatset($value['tgl_perawatan'] . ' ' . $value['jam']) . $zonawaktu;
+                    $mr_uuid_for_dispense = $medicationrequest_ids[$value['kode_brng']] ?? $this->gen_uuid();
+                    $medication_dispense = new MedicationDispense($uuid_medication_dispense, $this->organizationid, $no_rawat, $uuid_medication_for_dispense, $cek_obat['nama_kfa'], $ihs_patient, $nama_pasien, $uuid_encounter, $id_praktisi_apoteker['practitioner_id'] ?? '', $nama_praktisi_apoteker, $id_lokasi_satusehat, $mr_uuid_for_dispense, $time_prepared_handed, $time_prepared_handed, $cek_aturan_pakai['aturan'] ?? '', $value['jml'], $cek_obat['satuan_den'], $system_cek, $cek_obat['satuan_den'], $no . $this->ran_char());
+                    $medicationdispense_json .= $medication_dispense->toJson();
+                    $no++;
+                }
             } catch (\Exception $e) { continue; }
         }
     } catch (\Exception $e) {}
  
-    // ── Questionnaire & CarePlan Obat ──
     $questionare_json = ''; $careplan_medication_json = '';
     try {
         if ($medicationdispense_json) {
-            $uuid_q = $this->gen_uuid();
-            $questionare = new QuestionareMedication($uuid_q, $uuid_encounter, $ihs_patient, $nama_pasien, $id_praktisi_apoteker['practitioner_id'] ?? '', $nama_praktisi_apoteker);
+            $uuid_questionare = $this->gen_uuid();
+            $questionare = new QuestionareMedication($uuid_questionare, $uuid_encounter, $ihs_patient, $nama_pasien, $id_praktisi_apoteker['practitioner_id'] ?? '', $nama_praktisi_apoteker);
             $questionare_json = $questionare->toJson();
-            $uuid_cp = $this->gen_uuid();
-            $careplan = new CarePlan($ihs_patient, $uuid_encounter, $uuid_cp, "Pasien Mendapatkan Resep Obat", "Resep Obat", $no_ktp_dokter['practitioner_id'] ?? '');
+            $uuid_careplan = $this->gen_uuid();
+            $careplan = new CarePlan($ihs_patient, $uuid_encounter, $uuid_careplan, "Pasien Mendapatkan Resep Obat", "Resep Obat", $no_ktp_dokter['practitioner_id'] ?? '');
             $careplan_medication_json = $careplan->toJsonBundle() . ',';
         }
     } catch (\Exception $e) {}
  
-    // ── Lab ──
+    $clinical_impression_json_history = '';
+    try {
+        if (!empty($inProg['keluhan'])) {
+            $clinicalimpression_history = new ClinicalImpression($this->organizationid, $uuid_clinical_impression_history, $no_rawat, $ihs_patient, $nama_pasien, $uuid_encounter, $inProg['keluhan'], "in-progress");
+            $clinical_impression_json_history = $clinicalimpression_history->toJsonBundle() . ',';
+        }
+    } catch (\Exception $e) {}
+ 
+    $clinical_impression_json_prognosis = '';
+    try {
+        if (!empty($inProg['penilaian'])) {
+            $clinicalimpression = new ClinicalImpression($this->organizationid, $uuid_clinical_impression_prognosis, $no_rawat, $ihs_patient, $nama_pasien, $uuid_encounter, $inProg['penilaian'], "completed");
+            $clinical_impression_json_prognosis = $clinicalimpression->toJsonBundle() . ',';
+        }
+    } catch (\Exception $e) {}
+ 
+    // ==== Lab ====
     $service_request_lab_json = []; $specimen_json = []; $observation_lab_json = []; $diagnostic_report_json = [];
     try {
         $permintaan_lab = $this->db('permintaan_lab')->join('permintaan_pemeriksaan_lab', 'permintaan_lab.noorder = permintaan_pemeriksaan_lab.noorder')->where('no_rawat', $no_rawat)->toArray();
         foreach ($permintaan_lab as $value) {
             try {
-                $mapping_lab = $this->db('mlite_satu_sehat_mapping_lab')->where('kd_jenis_prw', $value['kd_jenis_prw'])->oneArray();
-                if (!$mapping_lab || $mapping_lab['id_template'] == '' || $mapping_lab['jenis_pemeriksaan'] != 'tunggal') continue;
-                $praktisi_lab      = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id', 'kd_dokter')->where('jenis_praktisi', 'Laboratorium')->toArray();
-                $id_praktisi_lab   = $praktisi_lab[array_rand($praktisi_lab)];
-                $perujuk_lab       = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id')->where('kd_dokter', $value['dokter_perujuk'])->oneArray();
-                $nama_perujuk_lab  = $this->core->getPegawaiInfo('nama', $value['dokter_perujuk']);
-                $nm_tindakan_lab   = $this->db('jns_perawatan_lab')->select('nm_perawatan')->where('kd_jenis_prw', $value['kd_jenis_prw'])->oneArray();
-                $time_sampled_lab  = $this->convertTimeSatset($value['tgl_sample'] . ' ' . $value['jam_sample']) . $zonawaktu;
-                $time_result_lab   = $this->convertTimeSatset($value['tgl_hasil']  . ' ' . $value['jam_hasil'])  . $zonawaktu;
-                $uuid_sr_lab  = $this->gen_uuid(); $uuid_sp_lab = $this->gen_uuid();
-                $uuid_obs_lab = $this->gen_uuid(); $uuid_dr_lab = $this->gen_uuid();
-                $sr_lab = new ServiceRequest($uuid_sr_lab, $this->organizationid, $no_rawat, $ihs_patient, $uuid_encounter, $perujuk_lab['practitioner_id'] ?? '', $nama_perujuk_lab, $mapping_lab['code_loinc'], $mapping_lab['display_loinc'], $mapping_lab['code_kptl'], $mapping_lab['display_kptl'], $nm_tindakan_lab['nm_perawatan'] ?? '');
-                $service_request_lab_json[] = $sr_lab->toJsonBundle() . ',';
-                $sp_lab = new Specimen($uuid_sp_lab, $this->organizationid, $ihs_patient, $nama_pasien, $uuid_sr_lab, $no_rawat, $time_sampled_lab);
-                $specimen_json[] = $sp_lab->toJsonBundle() . ',';
-                $hasil_lab = $this->db('detail_periksa_lab')->where('no_rawat', $no_rawat)->where('kd_jenis_prw', $value['kd_jenis_prw'])->where('tgl_periksa', $value['tgl_hasil'])->where('jam', $value['jam_hasil'])->oneArray();
-                $obs_lab = new Observation($uuid_encounter, $uuid_obs_lab, $ihs_patient, $id_praktisi_lab, $hasil_lab['nilai'] ?? '', $time_result_lab, "", "lab", $uuid_sp_lab, $uuid_sr_lab, $mapping_lab['code_loinc'], $mapping_lab['display_loinc']);
-                $observation_lab_json[] = $obs_lab->toJsonBundle() . ',';
-                $dr_lab = new DiagnosticReport($uuid_dr_lab, $uuid_sp_lab, $uuid_encounter, $uuid_sr_lab, $uuid_obs_lab, $id_praktisi_lab, $ihs_patient, $mapping_lab['code_loinc'], $mapping_lab['display_loinc'], $time_result_lab);
-                $diagnostic_report_json[] = $dr_lab->toJsonBundle() . ',';
+                $check_mapping_lab = $this->db('mlite_satu_sehat_mapping_lab')->where('kd_jenis_prw', $value['kd_jenis_prw'])->oneArray();
+                if ($check_mapping_lab && $check_mapping_lab['id_template'] != '' && $check_mapping_lab['jenis_pemeriksaan'] == 'tunggal') {
+                    $praktisi_lab          = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id', 'kd_dokter')->where('jenis_praktisi', 'Laboratorium')->toArray();
+                    $id_praktisi_lab       = $praktisi_lab[array_rand($praktisi_lab)];
+                    $no_ktp_dokter_perujuk = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id')->where('kd_dokter', $value['dokter_perujuk'])->oneArray();
+                    $nama_dokter_perujuk   = $this->core->getPegawaiInfo('nama', $value['dokter_perujuk']);
+                    $nama_tindakan         = $this->db('jns_perawatan_lab')->select('nm_perawatan')->where('kd_jenis_prw', $value['kd_jenis_prw'])->oneArray();
+                    $time_sampled          = $this->convertTimeSatset($value['tgl_sample'] . ' ' . $value['jam_sample']) . $zonawaktu;
+                    $time_result           = $this->convertTimeSatset($value['tgl_hasil'] . ' ' . $value['jam_hasil']) . $zonawaktu;
+                    $uuid_service_request_lab = $this->gen_uuid(); $uuid_specimen_lab = $this->gen_uuid();
+                    $uuid_observation_lab     = $this->gen_uuid(); $uuid_diagnostic_report = $this->gen_uuid();
+                    $service_request_lab = new ServiceRequest($uuid_service_request_lab, $this->organizationid, $no_rawat, $ihs_patient, $uuid_encounter, $no_ktp_dokter_perujuk['practitioner_id'] ?? '', $nama_dokter_perujuk, $check_mapping_lab['code_loinc'], $check_mapping_lab['display_loinc'], $check_mapping_lab['code_kptl'], $check_mapping_lab['display_kptl'], $nama_tindakan['nm_perawatan'] ?? '');
+                    $service_request_lab_json[] = $service_request_lab->toJsonBundle() . ',';
+                    $specimen_lab = new Specimen($uuid_specimen_lab, $this->organizationid, $ihs_patient, $nama_pasien, $uuid_service_request_lab, $no_rawat, $time_sampled);
+                    $specimen_json[] = $specimen_lab->toJsonBundle() . ',';
+                    $cek_hasil_lab = $this->db('detail_periksa_lab')->where('no_rawat', $no_rawat)->where('kd_jenis_prw', $value['kd_jenis_prw'])->where('tgl_periksa', $value['tgl_hasil'])->where('jam', $value['jam_hasil'])->oneArray();
+                    $observation_lab = new Observation($uuid_encounter, $uuid_observation_lab, $ihs_patient, $id_praktisi_lab, $cek_hasil_lab['nilai'] ?? '', $time_result, "", "lab", $uuid_specimen_lab, $uuid_service_request_lab, $check_mapping_lab['code_loinc'], $check_mapping_lab['display_loinc']);
+                    $observation_lab_json[] = $observation_lab->toJsonBundle() . ',';
+                    $diagnostic_report_lab = new DiagnosticReport($uuid_diagnostic_report, $uuid_specimen_lab, $uuid_encounter, $uuid_service_request_lab, $uuid_observation_lab, $id_praktisi_lab, $ihs_patient, $check_mapping_lab['code_loinc'], $check_mapping_lab['display_loinc'], $time_result);
+                    $diagnostic_report_json[] = $diagnostic_report_lab->toJsonBundle() . ',';
+                }
             } catch (\Exception $e) { continue; }
         }
     } catch (\Exception $e) {}
@@ -2017,19 +2010,20 @@ public function postDeleteStudy()
     $service_request_lab_json_decode = implode("\n", $service_request_lab_json);
     $specimen_lab_json_decode        = implode("\n", $specimen_json);
     $observation_lab_json_decode     = implode("\n", $observation_lab_json);
-    $diagnostic_report_lab_json_decode = implode("\n", $diagnostic_report_json);
+    $diagnostic_report_json_decode   = implode("\n", $diagnostic_report_json);
  
-    $careplan_lab_json = '';
+    $careplan_service_request_lab_json = '';
     try {
         if ($service_request_lab_json_decode) {
-            $uuid_cp = $this->gen_uuid();
-            $careplan = new CarePlan($ihs_patient, $uuid_encounter, $uuid_cp, "Pasien Mendapatkan Pemeriksaan Laboratorium", "Pemeriksaan Laboratorium", $no_ktp_dokter['practitioner_id'] ?? '');
-            $careplan_lab_json = $careplan->toJsonBundle() . ',';
+            $uuid_careplan = $this->gen_uuid();
+            $careplan = new CarePlan($ihs_patient, $uuid_encounter, $uuid_careplan, "Pasien Mendapatkan Pemeriksaan Laboratorium", "Pemeriksaan Laboratorium", $no_ktp_dokter['practitioner_id'] ?? '');
+            $careplan_service_request_lab_json = $careplan->toJsonBundle() . ',';
         }
     } catch (\Exception $e) {}
  
-    // ── Radiologi ──
-    $service_request_rad_json = []; $specimen_rad_json = []; $observation_rad_json = []; $diagnostic_report_rad_json = [];
+    // ==== Radiologi ====
+    $service_request_rad_json = []; $specimen_rad_json = [];
+    $observation_rad_json = []; $diagnostic_report_rad_json = [];
     try {
         $permintaan_rad = $this->db('permintaan_radiologi')
             ->join('permintaan_pemeriksaan_radiologi', 'permintaan_pemeriksaan_radiologi.noorder = permintaan_radiologi.noorder')
@@ -2039,107 +2033,106 @@ public function postDeleteStudy()
             try {
                 $mapping_rad = $this->db('satu_sehat_mapping_radiologi')->where('kd_jenis_prw', $rad['kd_jenis_prw'])->oneArray();
                 if (!$mapping_rad) continue;
-                $perujuk_rad      = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id')->where('kd_dokter', $rad['dokter_perujuk'])->oneArray();
-                $nama_perujuk_rad = $this->core->getPegawaiInfo('nama', $rad['dokter_perujuk']);
-                $time_sampel_rad  = $this->convertTimeSatset($rad['tgl_sampel'] . ' ' . $rad['jam_sampel']) . $zonawaktu;
-                $time_hasil_rad   = $this->convertTimeSatset($rad['tgl_hasil']  . ' ' . $rad['jam_hasil'])  . $zonawaktu;
-                $hasil_rad        = $this->db('hasil_radiologi')->where('no_rawat', $no_rawat)->where('tgl_periksa', $rad['tgl_hasil'])->where('jam', $rad['jam_hasil'])->oneArray();
-                $nilai_hasil_rad  = addslashes($hasil_rad['hasil'] ?? '');
-                $uuid_sr_rad  = $this->gen_uuid(); $uuid_sp_rad = $this->gen_uuid();
-                $uuid_obs_rad = $this->gen_uuid(); $uuid_dr_rad = $this->gen_uuid();
+                $perujuk_rad  = $this->db('mlite_satu_sehat_mapping_praktisi')->select('practitioner_id')->where('kd_dokter', $rad['dokter_perujuk'])->oneArray();
+                $nm_perujuk_r = $this->core->getPegawaiInfo('nama', $rad['dokter_perujuk']);
+                $time_smp_r   = $this->convertTimeSatset($rad['tgl_sampel'] . ' ' . $rad['jam_sampel']) . $zonawaktu;
+                $time_res_r   = $this->convertTimeSatset($rad['tgl_hasil']  . ' ' . $rad['jam_hasil'])  . $zonawaktu;
+                $hasil_rad    = $this->db('hasil_radiologi')->where('no_rawat', $no_rawat)->where('tgl_periksa', $rad['tgl_hasil'])->where('jam', $rad['jam_hasil'])->oneArray();
+                $nilai_rad    = addslashes($hasil_rad['hasil'] ?? '');
+                $uuid_sr_r = $this->gen_uuid(); $uuid_sp_r = $this->gen_uuid();
+                $uuid_ob_r = $this->gen_uuid(); $uuid_dr_r = $this->gen_uuid();
  
                 $service_request_rad_json[] = '{
-                "fullUrl":"urn:uuid:' . $uuid_sr_rad . '","resource":{"resourceType":"ServiceRequest","status":"completed","intent":"original-order",
+                "fullUrl":"urn:uuid:' . $uuid_sr_r . '","resource":{"resourceType":"ServiceRequest","status":"completed","intent":"original-order",
                 "category":[{"coding":[{"system":"http://snomed.info/sct","code":"363679005","display":"Imaging"}]}],
                 "code":{"coding":[{"system":"' . $mapping_rad['system'] . '","code":"' . $mapping_rad['code'] . '","display":"' . $mapping_rad['display'] . '"}]},
                 "subject":{"reference":"Patient/' . $ihs_patient . '","display":"' . $nama_pasien . '"},
                 "encounter":{"reference":"urn:uuid:' . $uuid_encounter . '"},
-                "requester":{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '","display":"' . $nama_perujuk_rad . '"},
+                "requester":{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '","display":"' . $nm_perujuk_r . '"},
                 "reasonCode":[{"text":"' . addslashes($rad['diagnosa_klinis']) . '"}]
                 },"request":{"method":"POST","url":"ServiceRequest"}},';
  
                 $specimen_rad_json[] = '{
-                "fullUrl":"urn:uuid:' . $uuid_sp_rad . '","resource":{"resourceType":"Specimen","status":"available",
+                "fullUrl":"urn:uuid:' . $uuid_sp_r . '","resource":{"resourceType":"Specimen","status":"available",
                 "type":{"coding":[{"system":"' . $mapping_rad['sampel_system'] . '","code":"' . $mapping_rad['sampel_code'] . '","display":"' . $mapping_rad['sampel_display'] . '"}]},
                 "subject":{"reference":"Patient/' . $ihs_patient . '","display":"' . $nama_pasien . '"},
-                "request":[{"reference":"urn:uuid:' . $uuid_sr_rad . '"}],
-                "collection":{"collector":{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '"},"collectedDateTime":"' . $time_sampel_rad . '"}
+                "request":[{"reference":"urn:uuid:' . $uuid_sr_r . '"}],
+                "collection":{"collector":{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '"},"collectedDateTime":"' . $time_smp_r . '"}
                 },"request":{"method":"POST","url":"Specimen"}},';
  
                 $observation_rad_json[] = '{
-                "fullUrl":"urn:uuid:' . $uuid_obs_rad . '","resource":{"resourceType":"Observation","status":"final",
+                "fullUrl":"urn:uuid:' . $uuid_ob_r . '","resource":{"resourceType":"Observation","status":"final",
                 "category":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/observation-category","code":"imaging","display":"Imaging"}]}],
                 "code":{"coding":[{"system":"' . $mapping_rad['system'] . '","code":"' . $mapping_rad['code'] . '","display":"' . $mapping_rad['display'] . '"}]},
                 "subject":{"reference":"Patient/' . $ihs_patient . '"},"encounter":{"reference":"urn:uuid:' . $uuid_encounter . '"},
-                "effectiveDateTime":"' . $time_hasil_rad . '","issued":"' . $time_hasil_rad . '",
+                "effectiveDateTime":"' . $time_res_r . '","issued":"' . $time_res_r . '",
                 "performer":[{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '"}],
-                "specimen":{"reference":"urn:uuid:' . $uuid_sp_rad . '"},
-                "basedOn":[{"reference":"urn:uuid:' . $uuid_sr_rad . '"}]
-                ' . ($nilai_hasil_rad ? ',"valueString":"' . $nilai_hasil_rad . '"' : '') . '
+                "specimen":{"reference":"urn:uuid:' . $uuid_sp_r . '"},"basedOn":[{"reference":"urn:uuid:' . $uuid_sr_r . '"}]
+                ' . ($nilai_rad ? ',"valueString":"' . $nilai_rad . '"' : '') . '
                 },"request":{"method":"POST","url":"Observation"}},';
  
                 $diagnostic_report_rad_json[] = '{
-                "fullUrl":"urn:uuid:' . $uuid_dr_rad . '","resource":{"resourceType":"DiagnosticReport","status":"final",
+                "fullUrl":"urn:uuid:' . $uuid_dr_r . '","resource":{"resourceType":"DiagnosticReport","status":"final",
                 "category":[{"coding":[{"system":"http://loinc.org","code":"18748-4","display":"Diagnostic imaging study"}]}],
                 "code":{"coding":[{"system":"' . $mapping_rad['system'] . '","code":"' . $mapping_rad['code'] . '","display":"' . $mapping_rad['display'] . '"}]},
                 "subject":{"reference":"Patient/' . $ihs_patient . '"},"encounter":{"reference":"urn:uuid:' . $uuid_encounter . '"},
-                "effectiveDateTime":"' . $time_hasil_rad . '","issued":"' . $time_hasil_rad . '",
+                "effectiveDateTime":"' . $time_res_r . '","issued":"' . $time_res_r . '",
                 "performer":[{"reference":"Practitioner/' . ($perujuk_rad['practitioner_id'] ?? '') . '"}],
-                "specimen":[{"reference":"urn:uuid:' . $uuid_sp_rad . '"}],
-                "result":[{"reference":"urn:uuid:' . $uuid_obs_rad . '"}],
-                "basedOn":[{"reference":"urn:uuid:' . $uuid_sr_rad . '"}]
-                ' . ($nilai_hasil_rad ? ',"conclusion":"' . $nilai_hasil_rad . '"' : '') . '
+                "specimen":[{"reference":"urn:uuid:' . $uuid_sp_r . '"}],"result":[{"reference":"urn:uuid:' . $uuid_ob_r . '"}],
+                "basedOn":[{"reference":"urn:uuid:' . $uuid_sr_r . '"}]
+                ' . ($nilai_rad ? ',"conclusion":"' . $nilai_rad . '"' : '') . '
                 },"request":{"method":"POST","url":"DiagnosticReport"}},';
  
             } catch (\Exception $e) { continue; }
         }
     } catch (\Exception $e) {}
  
-    $service_request_rad_json_decode   = implode("\n", $service_request_rad_json);
-    $specimen_rad_json_decode          = implode("\n", $specimen_rad_json);
-    $observation_rad_json_decode       = implode("\n", $observation_rad_json);
-    $diagnostic_report_rad_json_decode = implode("\n", $diagnostic_report_rad_json);
+    $service_request_rad_str   = implode("\n", $service_request_rad_json);
+    $specimen_rad_str          = implode("\n", $specimen_rad_json);
+    $observation_rad_str       = implode("\n", $observation_rad_json);
+    $diagnostic_report_rad_str = implode("\n", $diagnostic_report_rad_json);
  
-    // ── Build Bundle ──
+    // ==== Build Bundle ====
     $json_bundle = '{
-    "resourceType":"Bundle","type":"transaction",
-    "entry":[{
-        "fullUrl":"urn:uuid:' . $uuid_encounter . '",
-        "resource":{
-            "resourceType":"Encounter","status":"finished",
-            "class":{"system":"http://terminology.hl7.org/CodeSystem/v3-ActCode","code":"' . $code . '","display":"' . $display . '"},
-            "subject":{"reference":"Patient/' . $ihs_patient . '","display":"' . $nama_pasien . '"},
-            "participant":[{"type":[{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/v3-ParticipationType","code":"ATND","display":"attender"}]}],"individual":{"reference":"Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '","display":"' . $nama_dokter . '"}}],
-            "period":{
-                "start":"' . $this->convertTimeSatset($tgl_registrasi . ' ' . $jam_reg) . $zonawaktu . '",
-                "end":"' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"
+    "resourceType": "Bundle","type": "transaction",
+    "entry": [{
+        "fullUrl": "urn:uuid:' . $uuid_encounter . '",
+        "resource": {
+            "resourceType": "Encounter","status": "finished",
+            "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode","code": "' . $code . '","display": "' . $display . '"},
+            "subject": {"reference": "Patient/' . $ihs_patient . '","display": "' . $nama_pasien . '"},
+            "participant": [{"type": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType","code": "ATND","display": "attender"}]}],"individual": {"reference": "Practitioner/' . ($no_ktp_dokter['practitioner_id'] ?? '') . '","display": "' . $nama_dokter . '"}}],
+            "period": {
+                "start": "' . $this->convertTimeSatset($tgl_registrasi . ' ' . $jam_reg) . $zonawaktu . '",
+                "end": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"
             },
-            "location":[{"location":{"reference":"Location/' . $id_lokasi_satusehat . '","display":"' . $kd_poli . ' ' . $nm_poli . '"}}],
-            ' . (!empty($diagnosa_pasien['kd_penyakit']) ? '"diagnosis":[{"condition":{"reference":"urn:uuid:' . $uuid_condition . '","display":"' . ($diagnosa_pasien['nm_penyakit'] ?? '') . '"},"use":{"coding":[{"system":"http://terminology.hl7.org/CodeSystem/diagnosis-role","code":"DD","display":"Discharge diagnosis"}]},"rank":1}],' : '') . '
-            "statusHistory":[
-                {"status":"arrived","period":{"start":"' . $this->convertTimeSatset($tgl_registrasi . ' ' . $jam_reg) . $zonawaktu . '","end":"' . $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu . '"}},
-                {"status":"in-progress","period":{"start":"' . $this->convertTimeSatset($tgl_inprog . ' ' . $jam_inprog) . $zonawaktu . '","end":"' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"}},
-                {"status":"finished","period":{"start":"' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '","end":"' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"}}
+            "location": [{"location": {"reference": "Location/' . $id_lokasi_satusehat . '","display": "' . $kd_poli . ' ' . $nm_poli . '"}}],
+            ' . (!empty($diagnosa_pasien['kd_penyakit']) ? '"diagnosis": [{"condition": {"reference": "urn:uuid:' . $uuid_condition . '","display": "' . ($diagnosa_pasien['nm_penyakit'] ?? '') . '"},"use": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/diagnosis-role","code": "DD","display": "Discharge diagnosis"}]},"rank": 1}],' : '') . '
+            "statusHistory": [
+                {"status": "arrived","period": {"start": "' . $this->convertTimeSatset($tgl_registrasi . ' ' . $jam_reg) . $zonawaktu . '","end": "' . $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu . '"}},
+                {"status": "in-progress","period": {"start": "' . $this->convertTimeSatset(($inProg['tgl'] ?? $tgl_registrasi) . ' ' . ($inProg['jam'] ?? '00:00:00')) . $zonawaktu . '","end": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"}},
+                {"status": "finished","period": {"start": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '","end": "' . $this->convertTimeSatset($tgl_billing . ' ' . $jam_billing) . $zonawaktu . '"}}
             ],
-            "serviceProvider":{"reference":"Organization/' . $this->organizationid . '"},
-            "identifier":[{"system":"http://sys-ids.kemkes.go.id/encounter/' . $this->organizationid . '","value":"' . $no_rawat . '"}]
-        },"request":{"method":"POST","url":"Encounter"}
+            "serviceProvider": {"reference": "Organization/' . $this->organizationid . '"},
+            "identifier": [{"system": "http://sys-ids.kemkes.go.id/encounter/' . $this->organizationid . '","value": "' . $no_rawat . '"}]
+        },"request": {"method": "POST","url": "Encounter"}
     },' .
     $diastole_json . $sistole_json . $respiratory_json . $temperatur_json . $heart_rate_json .
-    $clinical_impression_json_history .
-    $careplan_json . $careplan_lab_json . $careplan_medication_json .
-    $service_request_lab_json_decode . $specimen_lab_json_decode . $observation_lab_json_decode . $diagnostic_report_lab_json_decode .
-    $service_request_rad_json_decode . $specimen_rad_json_decode . $observation_rad_json_decode . $diagnostic_report_rad_json_decode .
-    $condition_json . $procedure_json .
-    $medicationforrequest_json . $medicationrequest_json .
-    $questionare_json . $medicationfordispense_json . $medicationdispense_json .
+    $clinical_impression_json_history . $careplan_json . $careplan_service_request_lab_json .
+    $service_request_lab_json_decode . $specimen_lab_json_decode . $observation_lab_json_decode . $diagnostic_report_json_decode .
+    $service_request_rad_str . $specimen_rad_str . $observation_rad_str . $diagnostic_report_rad_str .
+    $condition_json . $procedure_json . $careplan_medication_json . $medicationforrequest_json .
+    $medicationrequest_json . $questionare_json . $medicationfordispense_json . $medicationdispense_json .
     $clinical_impression_json_prognosis . $composition_json . ']}';
- 
+              
     $curl = curl_init();
     curl_setopt_array($curl, [
         CURLOPT_URL            => $this->fhirurl,
         CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING       => '',
+        CURLOPT_MAXREDIRS      => 10,
         CURLOPT_TIMEOUT        => 60,
+        CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Authorization: Bearer ' . json_decode($this->getToken())->access_token],
         CURLOPT_CUSTOMREQUEST  => 'POST',
@@ -2148,54 +2141,64 @@ public function postDeleteStudy()
     $response = curl_exec($curl);
     curl_close($curl);
  
-    // ── Parse response ──
-    $id_encounter = ''; $id_condition = ''; $id_procedure = null; $id_composition = null;
-    $id_observation_respiratory = null; $id_observation_temp = null; $id_observation_nadi = null;
-    $id_medication_request = null; $id_medication_dispense = null; $id_clinical_impression = null;
-    $id_service_request_lab = null; $id_specimen_lab = null; $id_observation_lab = null; $id_diagnostic_report_lab = null;
-    $id_service_request_rad = null; $id_specimen_rad = null; $id_observation_rad = null; $id_diagnostic_report_rad = null;
-    $id_careplan = null;
+    $id_encounter = ''; $id_condition = ''; $id_observation_respiratory = null;
+    $id_observation_temp = null; $id_observation_nadi = null; $id_procedure = null;
+    $id_composition = null; $id_medication_request = null; $id_medication_dispense = null;
+    $id_clinical_impression = null; $id_service_request_lab = null; $id_specimen_lab = null;
+    $id_observation_lab = null; $id_diagnostic_report_lab = null; $id_careplan = null;
+    $id_rad_request = null; $id_rad_specimen = null; $id_rad_observation = null; $id_rad_diagnostic = null;
  
     $decodedResponse = json_decode($response);
-    $entry = (is_object($decodedResponse) && isset($decodedResponse->entry) && is_array($decodedResponse->entry)) ? $decodedResponse->entry : [];
+    $entry = (is_object($decodedResponse) && isset($decodedResponse->entry) && is_array($decodedResponse->entry))
+        ? $decodedResponse->entry : [];
  
+    $index = '';
     foreach ((array)$entry as $key => $value) {
-        $rt = $value->response->resourceType ?? null;
-        if (!$rt) continue;
-        if ($rt == 'Encounter')          $id_encounter           = $value->response->resourceID;
-        if ($rt == 'Condition')          $id_condition           = $value->response->resourceID;
-        if ($rt == 'Procedure')          $id_procedure           = $value->response->resourceID;
-        if ($rt == 'Composition')        $id_composition         = $value->response->resourceID;
-        if ($rt == 'MedicationRequest')  $id_medication_request  = $value->response->resourceID;
-        if ($rt == 'MedicationDispense') $id_medication_dispense = $value->response->resourceID;
-        if ($rt == 'ClinicalImpression') $id_clinical_impression = $value->response->resourceID;
-        if ($rt == 'ServiceRequest')     $id_service_request_lab = $id_service_request_lab ?: $value->response->resourceID;
-        if ($rt == 'Specimen')           $id_specimen_lab        = $id_specimen_lab        ?: $value->response->resourceID;
-        if ($rt == 'DiagnosticReport')   $id_diagnostic_report_lab = $id_diagnostic_report_lab ?: $value->response->resourceID;
-        if ($rt == 'CarePlan')           $id_careplan            = $value->response->resourceID;
-        if ($rt == 'Observation') {
+        $resourceType = $value->response->resourceType ?? null;
+        if ($resourceType === null) continue;
+        $index .= ' { ' . $key . '. ' . $resourceType . ' } ';
+        if ($resourceType == 'Encounter')          { $id_encounter           = $value->response->resourceID; }
+        if ($resourceType == 'Condition')          { $id_condition           = $value->response->resourceID; }
+        if ($resourceType == 'Procedure')          { $id_procedure           = $value->response->resourceID; }
+        if ($resourceType == 'Composition')        { $id_composition         = $value->response->resourceID; }
+        if ($resourceType == 'MedicationRequest')  { $id_medication_request  = $value->response->resourceID; }
+        if ($resourceType == 'MedicationDispense') { $id_medication_dispense = $value->response->resourceID; }
+        if ($resourceType == 'ClinicalImpression') { $id_clinical_impression = $value->response->resourceID; }
+        if ($resourceType == 'CarePlan')           { $id_careplan            = $value->response->resourceID; }
+        if ($resourceType == 'ServiceRequest')     {
+            if ($service_request_rad_str && !$id_rad_request)   { $id_rad_request = $value->response->resourceID; }
+            elseif (!$id_service_request_lab)                    { $id_service_request_lab = $value->response->resourceID; }
+        }
+        if ($resourceType == 'Specimen') {
+            if ($specimen_rad_str && !$id_rad_specimen)          { $id_rad_specimen = $value->response->resourceID; }
+            elseif (!$id_specimen_lab)                           { $id_specimen_lab = $value->response->resourceID; }
+        }
+        if ($resourceType == 'DiagnosticReport') {
+            if ($diagnostic_report_rad_str && !$id_rad_diagnostic) { $id_rad_diagnostic = $value->response->resourceID; }
+            elseif (!$id_diagnostic_report_lab)                    { $id_diagnostic_report_lab = $value->response->resourceID; }
+        }
+        if ($resourceType == 'Observation') {
             if (!empty($respiratory_json) && !empty($temperatur_json) && !empty($heart_rate_json)) {
-                if ($key == '1') $id_observation_respiratory = $value->response->resourceID;
-                if ($key == '2') $id_observation_temp        = $value->response->resourceID;
-                if ($key == '3') $id_observation_nadi        = $value->response->resourceID;
+                if ($key == '1') { $id_observation_respiratory = $value->response->resourceID; }
+                if ($key == '2') { $id_observation_temp        = $value->response->resourceID; }
+                if ($key == '3') { $id_observation_nadi        = $value->response->resourceID; }
             } elseif (!empty($respiratory_json) && !empty($temperatur_json)) {
-                if ($key == '1') $id_observation_respiratory = $value->response->resourceID;
-                if ($key == '2') $id_observation_temp        = $value->response->resourceID;
+                if ($key == '1') { $id_observation_respiratory = $value->response->resourceID; }
+                if ($key == '2') { $id_observation_temp        = $value->response->resourceID; }
             } elseif (!empty($respiratory_json) && !empty($heart_rate_json)) {
-                if ($key == '1') $id_observation_respiratory = $value->response->resourceID;
-                if ($key == '2') $id_observation_nadi        = $value->response->resourceID;
+                if ($key == '1') { $id_observation_respiratory = $value->response->resourceID; }
+                if ($key == '2') { $id_observation_nadi        = $value->response->resourceID; }
             } elseif (!empty($temperatur_json) && !empty($heart_rate_json)) {
-                if ($key == '1') $id_observation_temp = $value->response->resourceID;
-                if ($key == '2') $id_observation_nadi = $value->response->resourceID;
-            } elseif (!empty($respiratory_json)) $id_observation_respiratory = $value->response->resourceID;
-            elseif (!empty($temperatur_json))    $id_observation_temp        = $value->response->resourceID;
-            elseif (!empty($heart_rate_json))    $id_observation_nadi        = $value->response->resourceID;
-            if ($observation_lab_json_decode)    $id_observation_lab         = $value->response->resourceID;
-            if ($observation_rad_json_decode)    $id_observation_rad         = $value->response->resourceID;
+                if ($key == '1') { $id_observation_temp = $value->response->resourceID; }
+                if ($key == '2') { $id_observation_nadi = $value->response->resourceID; }
+            } elseif (!empty($respiratory_json)) { if ($key == '1') { $id_observation_respiratory = $value->response->resourceID; } }
+            elseif (!empty($temperatur_json))    { if ($key == '1') { $id_observation_temp        = $value->response->resourceID; } }
+            elseif (!empty($heart_rate_json))    { if ($key == '1') { $id_observation_nadi        = $value->response->resourceID; } }
+            if ($observation_lab_json_decode && !$id_observation_lab) { $id_observation_lab = $value->response->resourceID; }
+            if ($observation_rad_str && !$id_rad_observation)         { $id_rad_observation = $value->response->resourceID; }
         }
     }
  
-    // ── Simpan response ──
     $pesan = 'Gagal mengirim pasien dengan No Rawat : ' . $no_rawat . ' ke platform Satu Sehat!!';
     if ($id_encounter) {
         $this->db('mlite_satu_sehat_response')->save([
@@ -2214,10 +2217,10 @@ public function postDeleteStudy()
             'id_lab_pk_specimen'          => $id_specimen_lab,
             'id_lab_pk_observation'       => $id_observation_lab,
             'id_lab_pk_diagnostic'        => $id_diagnostic_report_lab,
-            'id_rad_request'              => $id_service_request_rad,
-            'id_rad_specimen'             => $id_specimen_rad,
-            'id_rad_observation'          => $id_observation_rad,
-            'id_rad_diagnostic'           => $id_diagnostic_report_rad,
+            'id_rad_request'              => $id_rad_request,
+            'id_rad_specimen'             => $id_rad_specimen,
+            'id_rad_observation'          => $id_rad_observation,
+            'id_rad_diagnostic'           => $id_rad_diagnostic,
             'id_careplan'                 => $id_careplan,
         ]);
         $pesan = 'Sukses mengirim pasien dengan No Rawat : ' . $no_rawat . ' ke platform Satu Sehat!!';
@@ -2237,18 +2240,18 @@ public function postDeleteStudy()
             ['label' => 'Nadi',                  'id' => $id_observation_nadi,       'sent' => !empty($id_observation_nadi),       'skip' => empty($heart_rate_json)],
             ['label' => 'Procedure',             'id' => $id_procedure,              'sent' => !empty($id_procedure),              'skip' => empty($procedure_json)],
             ['label' => 'Clinical Impression',   'id' => $id_clinical_impression,    'sent' => !empty($id_clinical_impression),    'skip' => (empty($clinical_impression_json_history) && empty($clinical_impression_json_prognosis))],
-            ['label' => 'Medication Request',    'id' => $id_medication_request,     'sent' => !empty($id_medication_request),     'skip' => empty($medicationrequest_json)],
+            ['label' => 'Medication (Resep)',    'id' => $id_medication_request,     'sent' => !empty($id_medication_request),     'skip' => empty($medicationrequest_json)],
             ['label' => 'Medication Dispense',   'id' => $id_medication_dispense,    'sent' => !empty($id_medication_dispense),    'skip' => empty($medicationdispense_json)],
             ['label' => 'Lab Service Request',   'id' => $id_service_request_lab,    'sent' => !empty($id_service_request_lab),    'skip' => empty($service_request_lab_json_decode)],
             ['label' => 'Lab Specimen',          'id' => $id_specimen_lab,           'sent' => !empty($id_specimen_lab),           'skip' => empty($specimen_lab_json_decode)],
             ['label' => 'Lab Observation',       'id' => $id_observation_lab,        'sent' => !empty($id_observation_lab),        'skip' => empty($observation_lab_json_decode)],
-            ['label' => 'Lab Diagnostic Report', 'id' => $id_diagnostic_report_lab,  'sent' => !empty($id_diagnostic_report_lab),  'skip' => empty($diagnostic_report_lab_json_decode)],
-            ['label' => 'Rad Service Request',   'id' => $id_service_request_rad,    'sent' => !empty($id_service_request_rad),    'skip' => empty($service_request_rad_json_decode)],
-            ['label' => 'Rad Specimen',          'id' => $id_specimen_rad,           'sent' => !empty($id_specimen_rad),           'skip' => empty($specimen_rad_json_decode)],
-            ['label' => 'Rad Observation',       'id' => $id_observation_rad,        'sent' => !empty($id_observation_rad),        'skip' => empty($observation_rad_json_decode)],
-            ['label' => 'Rad Diagnostic Report', 'id' => $id_diagnostic_report_rad,  'sent' => !empty($id_diagnostic_report_rad),  'skip' => empty($diagnostic_report_rad_json_decode)],
+            ['label' => 'Lab Diagnostic Report', 'id' => $id_diagnostic_report_lab,  'sent' => !empty($id_diagnostic_report_lab),  'skip' => empty($diagnostic_report_json_decode)],
+            ['label' => 'Rad Service Request',   'id' => $id_rad_request,            'sent' => !empty($id_rad_request),            'skip' => empty($service_request_rad_str)],
+            ['label' => 'Rad Specimen',          'id' => $id_rad_specimen,           'sent' => !empty($id_rad_specimen),           'skip' => empty($specimen_rad_str)],
+            ['label' => 'Rad Observation',       'id' => $id_rad_observation,        'sent' => !empty($id_rad_observation),        'skip' => empty($observation_rad_str)],
+            ['label' => 'Rad Diagnostic Report', 'id' => $id_rad_diagnostic,         'sent' => !empty($id_rad_diagnostic),         'skip' => empty($diagnostic_report_rad_str)],
             ['label' => 'Composition',           'id' => $id_composition,            'sent' => !empty($id_composition)],
-            ['label' => 'Care Plan',             'id' => $id_careplan,               'sent' => !empty($id_careplan),               'skip' => (empty($careplan_json) && empty($careplan_medication_json) && empty($careplan_lab_json))],
+            ['label' => 'Care Plan',             'id' => $id_careplan,               'sent' => !empty($id_careplan),               'skip' => (empty($careplan_json) && empty($careplan_medication_json))],
         ],
         'raw_response' => json_decode($response, true),
     ];
@@ -2268,6 +2271,280 @@ public function postDeleteStudy()
         exit();
     }
   }
+
+  public function getSearchPasienBunban($periode = '', $nama = '')
+{
+    ob_start();
+    if (!$periode) $periode = date('Y-m-d');
+    $nama = urldecode($nama);
+    if ($nama === '-') $nama = '';
+ 
+    $query = $this->db('reg_periksa')
+        ->join('pasien', 'pasien.no_rkm_medis = reg_periksa.no_rkm_medis')
+        ->where('reg_periksa.tgl_registrasi', $periode)
+        ->where('reg_periksa.stts', '!=', 'Batal')
+        ->where('reg_periksa.kd_poli', '!=', 'IGD01');
+ 
+    if (!empty($nama)) {
+        $query = $query->where('pasien.nm_pasien', 'LIKE', '%' . $nama . '%');
+    }
+ 
+    $rows = $query->toArray();
+ 
+    $result = [];
+    foreach ($rows as $row) {
+        if (!in_array($row['status_lanjut'], ['Ralan', 'Ranap'])) continue;
+        $ss     = $this->db('mlite_satu_sehat_response')->where('no_rawat', $row['no_rawat'])->oneArray();
+        $status = !empty($ss['id_encounter']) ? 'done' : 'pending';
+        $result[] = [
+            'no_rawat'        => $row['no_rawat'],
+            'no_rkm_medis'    => $row['no_rkm_medis'],
+            'nm_pasien'       => $row['nm_pasien'],
+            'status_lanjut'   => $row['status_lanjut'],
+            'status'          => $status,
+            'no_rawat_key'    => str_replace('/', '', $row['no_rawat']),
+        ];
+    }
+ 
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
+    echo json_encode(['success' => true, 'data' => $result, 'total' => count($result)]);
+    exit();
+}
+ 
+// ================================================================
+// postStartBunban — Daftarkan pasien ke job queue
+// POST /satu_sehat/startbunban
+// no_rawat_list[] → dari pencarian (opsional)
+// batch_size      → fallback kalau tidak ada pencarian
+// ================================================================
+public function postStartBunban()
+{
+    ob_start();
+    $periode        = $_POST['periode']    ?? date('Y-m-d');
+    $batch_size     = $_POST['batch_size'] ?? '10';
+    $no_rawat_list  = $_POST['no_rawat_list'] ?? []; // array dari checkbox
+ 
+    $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
+ 
+    // Mode A: user pilih manual dari pencarian
+    if (!empty($no_rawat_list)) {
+        $pasien_list = [];
+        foreach ($no_rawat_list as $nrc) {
+            $no_rawat     = revertNoRawat($nrc);
+            $no_rkm_medis = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
+            $nm_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
+            $status_lanjut = $this->core->getRegPeriksaInfo('status_lanjut', $no_rawat);
+            if (!in_array($status_lanjut, ['Ralan', 'Ranap'])) continue;
+            $pasien_list[] = ['no_rawat' => $no_rawat, 'nm_pasien' => $nm_pasien];
+        }
+    } else {
+        // Mode B: ambil otomatis sesuai batch_size
+        $query = $this->db('reg_periksa')
+            ->where('tgl_registrasi', $periode)
+            ->where('stts', '!=', 'Batal')
+            ->where('kd_poli', '!=', 'IGD01');
+        if ($batch_size !== 'all') $query = $query->limit((int)$batch_size);
+        $rows = $query->toArray();
+        $pasien_list = [];
+        foreach ($rows as $row) {
+            if (!in_array($row['status_lanjut'], ['Ralan', 'Ranap'])) continue;
+            $nm_pasien = $this->core->getPasienInfo('nm_pasien', $row['no_rkm_medis']);
+            $pasien_list[] = ['no_rawat' => $row['no_rawat'], 'nm_pasien' => $nm_pasien];
+        }
+    }
+ 
+    // Insert ke job_queue — cek status dari mlite_satu_sehat_response
+    foreach ($pasien_list as $p) {
+        $ss     = $this->db('mlite_satu_sehat_response')->where('no_rawat', $p['no_rawat'])->oneArray();
+        $status = !empty($ss['id_encounter']) ? 'skip' : 'pending';
+        $this->db('satu_sehat_job_queue')->save([
+            'periode'   => $periode,
+            'no_rawat'  => $p['no_rawat'],
+            'nm_pasien' => $p['nm_pasien'],
+            'status'    => $status,
+        ]);
+    }
+ 
+    $all     = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
+    $total   = count($all);
+    $pending = count(array_filter($all, fn($r) => $r['status'] === 'pending'));
+    $skip    = count(array_filter($all, fn($r) => $r['status'] === 'skip'));
+ 
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
+    echo json_encode([
+        'success'    => true,
+        'periode'    => $periode,
+        'total'      => $total,
+        'pending'    => $pending,
+        'done'       => $skip,
+        'sukses'     => 0,
+        'skip'       => $skip,
+        'error'      => 0,
+        'all'        => array_map(fn($r) => [
+            'no_rawat'    => $r['no_rawat'],
+            'nm_pasien'   => $r['nm_pasien'],
+            'status'      => $r['status'],
+            'detail_json' => $r['detail_json'] ? json_decode($r['detail_json'], true) : [],
+            'error_msg'   => $r['error_msg'],
+        ], $all),
+    ]);
+    exit();
+}
+ 
+// ================================================================
+// getProcessBunban — Proses 1 pasien
+// GET /satu_sehat/processbunban/{no_rawat_converted}
+// ================================================================
+public function getProcessBunban($no_rawat_converted = '')
+{
+    ob_start();
+ 
+    if (!$no_rawat_converted) {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'no_rawat tidak ada']);
+        exit();
+    }
+ 
+    $no_rawat     = revertNoRawat($no_rawat_converted);
+    $no_rkm_medis = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
+    $nm_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
+ 
+    $this->db('satu_sehat_job_queue')->where('no_rawat', $no_rawat)->save(['status' => 'processing']);
+ 
+    try {
+        $result_raw = $this->getEncounterBundle(convertNorawat($no_rawat), 'all');
+        $result_arr = json_decode(json_encode($result_raw), true);
+ 
+        $id_encounter = '';
+        $resources    = [];
+ 
+        if (!empty($result_arr['entry'])) {
+            foreach ($result_arr['entry'] as $entry) {
+                $resource_type = $entry['response']['resourceType'] ?? null;
+                $resource_id   = $entry['response']['resourceID']   ?? '';
+                $status_code   = $entry['response']['status']        ?? '';
+                if (!$resource_type) continue;
+                $sent = strpos($status_code, '201') !== false || strpos($status_code, '200') !== false;
+                if ($resource_type === 'Encounter' && $sent) $id_encounter = $resource_id;
+                $resources[] = [
+                    'label' => $resource_type,
+                    'id'    => $resource_id,
+                    'sent'  => $sent,
+                    'skip'  => false,
+                    'error' => $sent ? '' : ($entry['response']['outcome']['issue'][0]['details']['text'] ?? 'Gagal'),
+                ];
+            }
+        }
+ 
+        if (!empty($result_arr['issue'])) {
+            $error_msg = $result_arr['issue'][0]['details']['text'] ?? 'Unknown error';
+            $detail    = [['label' => 'Bundle', 'sent' => false, 'error' => $error_msg]];
+            $this->db('satu_sehat_job_queue')->where('no_rawat', $no_rawat)->save([
+                'status' => 'error', 'error_msg' => $error_msg, 'detail_json' => json_encode($detail),
+            ]);
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Type: application/json');
+            header('Cache-Control: no-cache');
+            echo json_encode(['success' => false, 'status' => 'error', 'no_rawat' => $no_rawat, 'nm_pasien' => $nm_pasien, 'message' => $error_msg, 'resources' => $detail]);
+            exit();
+        }
+ 
+        $final_status = $id_encounter ? 'done' : 'error';
+        $this->db('satu_sehat_job_queue')->where('no_rawat', $no_rawat)->save([
+            'status'      => $final_status,
+            'detail_json' => json_encode($resources),
+            'error_msg'   => $id_encounter ? null : 'Encounter gagal terkirim',
+        ]);
+ 
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+        header('Cache-Control: no-cache');
+        echo json_encode([
+            'success'   => !empty($id_encounter),
+            'status'    => $final_status,
+            'no_rawat'  => $no_rawat,
+            'nm_pasien' => $nm_pasien,
+            'message'   => $id_encounter ? 'Sukses!' : 'Encounter gagal terkirim',
+            'resources' => $resources,
+        ]);
+        exit();
+ 
+    } catch (\Exception $e) {
+        $detail = [['label' => 'Exception', 'sent' => false, 'error' => $e->getMessage()]];
+        $this->db('satu_sehat_job_queue')->where('no_rawat', $no_rawat)->save([
+            'status' => 'error', 'error_msg' => $e->getMessage(), 'detail_json' => json_encode($detail),
+        ]);
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+        header('Cache-Control: no-cache');
+        echo json_encode(['success' => false, 'status' => 'error', 'no_rawat' => $no_rawat, 'nm_pasien' => $nm_pasien, 'message' => $e->getMessage(), 'resources' => $detail]);
+        exit();
+    }
+}
+ 
+// ================================================================
+// getStatusBunban — Summary progress per periode
+// GET /satu_sehat/statusbunban/{periode}
+// ================================================================
+public function getStatusBunban($periode = '')
+{
+    ob_start();
+    if (!$periode) $periode = date('Y-m-d');
+ 
+    $all    = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
+    $total  = count($all);
+    $done   = 0; $sukses = 0; $skip = 0; $error = 0; $pending = 0;
+    $pasien = [];
+ 
+    foreach ($all as $row) {
+        if ($row['status'] === 'done')           { $done++; $sukses++; }
+        elseif ($row['status'] === 'skip')       { $done++; $skip++; }
+        elseif ($row['status'] === 'error')      { $done++; $error++; }
+        elseif ($row['status'] === 'processing') { $done++; }
+        else $pending++;
+ 
+        $pasien[] = [
+            'no_rawat'    => $row['no_rawat'],
+            'nm_pasien'   => $row['nm_pasien'],
+            'status'      => $row['status'],
+            'error_msg'   => $row['error_msg'],
+            'detail_json' => $row['detail_json'] ? json_decode($row['detail_json'], true) : [],
+        ];
+    }
+ 
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
+    echo json_encode([
+        'success' => true, 'periode' => $periode,
+        'total'   => $total, 'done' => $done, 'pending' => $pending,
+        'sukses'  => $sukses, 'skip' => $skip, 'error' => $error,
+        'pct'     => $total > 0 ? round(($done / $total) * 100) : 0,
+        'pasien'  => $pasien,
+    ]);
+    exit();
+}
+ 
+// ================================================================
+// postResetBunban — Hapus job queue periode tertentu
+// POST /satu_sehat/resetbunban
+// ================================================================
+public function postResetBunban()
+{
+    ob_start();
+    $periode = $_POST['periode'] ?? date('Y-m-d');
+    $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
+    echo json_encode(['success' => true, 'message' => 'Job queue direset untuk ' . $periode]);
+    exit();
+}
 
   public function getCondition($no_rawat, $render = true)
   {
@@ -5891,267 +6168,6 @@ public function postDeleteStudy()
     }
  
     redirect(url([ADMIN, 'satu_sehat', 'mappingobat']));
-  }
-
-  // ================================================================
-  // postStartBunban
-  // Daftarkan semua pasien Ralan+Ranap ke satu_sehat_job_queue
-  // POST /satu_sehat/startbunban
-  // ================================================================
-  public function postStartBunban()
-  {
-      header('Content-Type: application/json');
-  
-      $periode    = $_POST['periode']    ?? date('Y-m-d');
-      $batch_size = $_POST['batch_size'] ?? '10'; // 'all' atau angka
-  
-      // FIX: hapus job_queue periode ini dulu — fresh run tiap klik Start
-      $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
-  
-      // Ambil pasien — limit sesuai batch_size
-      $query = $this->db('reg_periksa')
-          ->where('tgl_registrasi', $periode)
-          ->where('stts', '!=', 'Batal')
-          ->where('kd_poli', '!=', 'IGD01');
-  
-      if ($batch_size !== 'all') {
-          $query = $query->limit((int)$batch_size);
-      }
-  
-      $pasien_list = $query->toArray();
-  
-      $registered = 0;
-      foreach ($pasien_list as $row) {
-          if (!in_array($row['status_lanjut'], ['Ralan', 'Ranap'])) continue;
-  
-          $nm_pasien = $this->core->getPasienInfo('nm_pasien', $row['no_rkm_medis']);
-  
-          // Cek apakah sudah terkirim sebelumnya di mlite_satu_sehat_response
-          $ss     = $this->db('mlite_satu_sehat_response')->where('no_rawat', $row['no_rawat'])->oneArray();
-          $status = (!empty($ss['id_encounter'])) ? 'skip' : 'pending';
-  
-          $this->db('satu_sehat_job_queue')->save([
-              'periode'   => $periode,
-              'no_rawat'  => $row['no_rawat'],
-              'nm_pasien' => $nm_pasien,
-              'status'    => $status,
-          ]);
-          $registered++;
-      }
-  
-      // Ambil summary dari job_queue yang baru
-      $all     = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
-      $total   = count($all);
-      $pending = count(array_filter($all, fn($r) => $r['status'] === 'pending'));
-      $skip    = count(array_filter($all, fn($r) => $r['status'] === 'skip'));
-  
-      echo json_encode([
-          'success'    => true,
-          'periode'    => $periode,
-          'total'      => $total,
-          'pending'    => $pending,
-          'done'       => $skip, // skip dianggap done
-          'sukses'     => 0,
-          'skip'       => $skip,
-          'error'      => 0,
-          'registered' => $registered,
-          'all'        => array_map(fn($r) => [
-              'no_rawat'    => $r['no_rawat'],
-              'nm_pasien'   => $r['nm_pasien'],
-              'status'      => $r['status'],
-              'detail_json' => $r['detail_json'] ? json_decode($r['detail_json'], true) : [],
-              'error_msg'   => $r['error_msg'],
-          ], $all),
-      ]);
-      exit();
-  }
-  
-  // ================================================================
-  // getProcessBunban
-  // Proses 1 pasien — return detail per resource
-  // GET /satu_sehat/processbunban/{no_rawat_converted}
-  // ================================================================
-  public function getProcessBunban($no_rawat_converted = '')
-  {
-      ob_start();
-      header('Content-Type: application/json');
-  
-      if (!$no_rawat_converted) {
-          ob_end_clean();
-          echo json_encode(['success' => false, 'message' => 'no_rawat tidak ada']);
-          exit();
-      }
-  
-      $no_rawat     = revertNoRawat($no_rawat_converted);
-      $no_rkm_medis = $this->core->getRegPeriksaInfo('no_rkm_medis', $no_rawat);
-      $nm_pasien    = $this->core->getPasienInfo('nm_pasien', $no_rkm_medis);
-  
-      // Set status processing
-      $this->db('satu_sehat_job_queue')
-          ->where('no_rawat', $no_rawat)
-          ->save(['status' => 'processing']);
-  
-      // Cek apakah sudah ada di Satu Sehat
-      $ss_response = $this->db('mlite_satu_sehat_response')->where('no_rawat', $no_rawat)->oneArray();
-      if (!empty($ss_response['id_encounter'])) {
-          $detail = [['label' => 'Encounter', 'id' => $ss_response['id_encounter'], 'sent' => true, 'skip' => true]];
-          $this->db('satu_sehat_job_queue')
-              ->where('no_rawat', $no_rawat)
-              ->save(['status' => 'skip', 'detail_json' => json_encode($detail)]);
-          ob_end_clean();
-          echo json_encode([
-              'success'   => true,
-              'status'    => 'skip',
-              'no_rawat'  => $no_rawat,
-              'nm_pasien' => $nm_pasien,
-              'message'   => 'Sudah ada di Satu Sehat — dilewati',
-              'resources' => $detail,
-          ]);
-          exit();
-      }
-  
-      // Proses kirim bundle
-      try {
-          $result_raw = $this->getEncounterBundle(convertNorawat($no_rawat), 'all');
-          $result_arr = json_decode(json_encode($result_raw), true);
-  
-          $id_encounter = '';
-          $resources    = [];
-  
-          // Parse entry per resource
-          if (!empty($result_arr['entry'])) {
-              foreach ($result_arr['entry'] as $entry) {
-                  $resource_type = $entry['response']['resourceType'] ?? null;
-                  $resource_id   = $entry['response']['resourceID']   ?? '';
-                  $status_code   = $entry['response']['status']        ?? '';
-                  if (!$resource_type) continue;
-                  $sent = strpos($status_code, '201') !== false || strpos($status_code, '200') !== false;
-                  if ($resource_type === 'Encounter' && $sent) $id_encounter = $resource_id;
-                  $resources[] = [
-                      'label' => $resource_type,
-                      'id'    => $resource_id,
-                      'sent'  => $sent,
-                      'skip'  => false,
-                      'error' => $sent ? '' : ($entry['response']['outcome']['issue'][0]['details']['text'] ?? 'Gagal'),
-                  ];
-              }
-          }
-  
-          // Cek error bundle
-          if (!empty($result_arr['issue'])) {
-              $error_msg = $result_arr['issue'][0]['details']['text'] ?? 'Unknown error';
-              $detail    = [['label' => 'Bundle', 'sent' => false, 'error' => $error_msg]];
-              $this->db('satu_sehat_job_queue')
-                  ->where('no_rawat', $no_rawat)
-                  ->save(['status' => 'error', 'error_msg' => $error_msg, 'detail_json' => json_encode($detail)]);
-              ob_end_clean();
-              echo json_encode([
-                  'success'   => false,
-                  'status'    => 'error',
-                  'no_rawat'  => $no_rawat,
-                  'nm_pasien' => $nm_pasien,
-                  'message'   => $error_msg,
-                  'resources' => $detail,
-              ]);
-              exit();
-          }
-  
-          $final_status = $id_encounter ? 'done' : 'error';
-          $this->db('satu_sehat_job_queue')
-              ->where('no_rawat', $no_rawat)
-              ->save([
-                  'status'      => $final_status,
-                  'detail_json' => json_encode($resources),
-                  'error_msg'   => $id_encounter ? null : 'Encounter gagal terkirim',
-              ]);
-  
-          ob_end_clean();
-          echo json_encode([
-              'success'   => $id_encounter ? true : false,
-              'status'    => $final_status,
-              'no_rawat'  => $no_rawat,
-              'nm_pasien' => $nm_pasien,
-              'message'   => $id_encounter ? 'Sukses!' : 'Encounter gagal terkirim',
-              'resources' => $resources,
-          ]);
-          exit();
-  
-      } catch (\Exception $e) {
-          $detail = [['label' => 'Exception', 'sent' => false, 'error' => $e->getMessage()]];
-          $this->db('satu_sehat_job_queue')
-              ->where('no_rawat', $no_rawat)
-              ->save(['status' => 'error', 'error_msg' => $e->getMessage(), 'detail_json' => json_encode($detail)]);
-          ob_end_clean();
-          echo json_encode([
-              'success'   => false,
-              'status'    => 'error',
-              'no_rawat'  => $no_rawat,
-              'nm_pasien' => $nm_pasien,
-              'message'   => $e->getMessage(),
-              'resources' => $detail,
-          ]);
-          exit();
-      }
-  }
-  
-  // ================================================================
-  // getStatusBunban
-  // Return summary progress per periode
-  // GET /satu_sehat/statusbunban/{periode}
-  // ================================================================
-  public function getStatusBunban($periode = '')
-  {
-      header('Content-Type: application/json');
-      if (!$periode) $periode = date('Y-m-d');
-  
-      $all    = $this->db('satu_sehat_job_queue')->where('periode', $periode)->toArray();
-      $total  = count($all);
-      $done   = 0; $sukses = 0; $skip = 0; $error = 0; $pending = 0;
-      $pasien = [];
-  
-      foreach ($all as $row) {
-          if ($row['status'] === 'done')       { $done++; $sukses++; }
-          elseif ($row['status'] === 'skip')   { $done++; $skip++; }
-          elseif ($row['status'] === 'error')  { $done++; $error++; }
-          elseif ($row['status'] === 'processing') { $done++; }
-          else $pending++;
-  
-          $pasien[] = [
-              'no_rawat'    => $row['no_rawat'],
-              'nm_pasien'   => $row['nm_pasien'],
-              'status'      => $row['status'],
-              'error_msg'   => $row['error_msg'],
-              'detail_json' => $row['detail_json'] ? json_decode($row['detail_json'], true) : [],
-          ];
-      }
-  
-      echo json_encode([
-          'success' => true,
-          'periode' => $periode,
-          'total'   => $total,
-          'done'    => $done,
-          'pending' => $pending,
-          'sukses'  => $sukses,
-          'skip'    => $skip,
-          'error'   => $error,
-          'pct'     => $total > 0 ? round(($done / $total) * 100) : 0,
-          'pasien'  => $pasien,
-      ]);
-      exit();
-  }
-  
-  // ================================================================
-  // postResetBunban
-  // Reset job queue untuk periode tertentu (hapus & daftar ulang)
-  // POST /satu_sehat/resetbunban
-  // ================================================================
-  public function postResetBunban()
-  {
-      header('Content-Type: application/json');
-      $periode = $_POST['periode'] ?? date('Y-m-d');
-      $this->db('satu_sehat_job_queue')->where('periode', $periode)->delete();
-      echo json_encode(['success' => true, 'message' => 'Job queue direset untuk ' . $periode]);
-      exit();
   }
 
   public function getResponse()
